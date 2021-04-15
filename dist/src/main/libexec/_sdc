@@ -103,6 +103,9 @@ try_fetch_env_for_deployment_type() {
   EC2)
     CSP_ENV_FILE=${SDC_HOME}/libexec/csp-envs/ec2-env.sh
     ;;
+  GCE)
+    CSP_ENV_FILE=${SDC_HOME}/libexec/csp-envs/gce-env.sh
+    ;;
   *)
     CSP_ENV_FILE=""
     echo "Unknown STREAMSETS_DEPLOYMENT_TYPE: ${STREAMSETS_DEPLOYMENT_TYPE}"
