@@ -60,6 +60,10 @@ public class RecordWriterManager {
   private final static Logger LOG = LoggerFactory.getLogger(RecordWriterManager.class);
   public final static String TMP_FILE_PREFIX = "_tmp_";
 
+  private static final String staticExpReg = "\\$\\{(sdc:|pipeline:|runtime:)[a-zA-Z0-9\\(\\)]*\\}";
+  private static final String expReg = "\\$\\{[^}]*\\(*\\)\\}";
+  private static final String paramReg = "\\$\\{[^}]*\\}";
+
   private final static String DOT = ".";
   private FileSystem fs;
   private Configuration hdfsConf;
@@ -312,23 +316,32 @@ public class RecordWriterManager {
 
     String globPath = dirPathTemplate;
 
-    final String staticExpReg = "\\$\\{(sdc:|pipeline:|runtime:)[a-zA-Z0-9\\(\\)]*\\}";
+    // Solve expressions of type ${sdc:xxx}, ${pipeline:xxx, ${runtime:xxx}
     Pattern pattern = Pattern.compile(staticExpReg);
     Matcher matcher = pattern.matcher(globPath);
     ELEval eval = context.createELEval("dirPathTemplate");
     ELVars vars = context.createELVars();
 
     while (matcher.find()) {
-      String expressionString = eval.eval(vars, matcher.group(), String.class);
-      globPath = globPath.replace(matcher.group(), expressionString);
+      globPath = globPath.replace(matcher.group(), eval.eval(vars, matcher.group(), String.class));
     }
 
-    final String expReg = "\\$\\{[^}]*\\}";
+    // Replace expressions of type ${xxx()} by *
     pattern = Pattern.compile(expReg);
     matcher = pattern.matcher(globPath);
+
     while (matcher.find()) {
       globPath = globPath.replace(matcher.group(), "*");
     }
+
+    // Solve parameters of type ${parameter}
+    pattern = Pattern.compile(paramReg);
+    matcher = pattern.matcher(globPath);
+
+    while (matcher.find()) {
+      globPath = globPath.replace(matcher.group(), eval.eval(vars, matcher.group(), String.class));
+    }
+
     globPath = globPath.replaceAll("\\*+", "*");
     globPath = globPath + "/" + TMP_FILE_PREFIX + uniquePrefix + "*";
 
