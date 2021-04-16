@@ -32,8 +32,8 @@
   <name>StreamSets Data Collector JDBC Lib</name>
 
   <properties>
-    <mssql.version>8.4.1.jre8</mssql.version>
-    <postgresql.version>42.2.18</postgresql.version>
+    <mssql.version>9.2.1.jre8</mssql.version>
+    <postgresql.version>42.2.19</postgresql.version>
   </properties>
 
   <dependencies>
