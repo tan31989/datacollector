@@ -30,7 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @StageDef(
-    version = 2,
+    version = 3,
     label = "Field Type Converter",
     description = "Converts the data type of a field(s)",
     icon = "converter.png",

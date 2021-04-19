@@ -36,6 +36,7 @@ import java.text.NumberFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.ZoneId;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -100,7 +101,9 @@ public class FieldTypeConverterProcessor extends SingleLaneRecordProcessor {
           if (rootField != null) {
             record.set(processByType("", rootField));
           }
-          batchMaker.addRecord(record);
+          if (rootField == null || record.get() != null) {
+            batchMaker.addRecord(record);
+          }
           break;
         case BY_FIELD:
           processByField(record, batchMaker);
@@ -117,8 +120,18 @@ public class FieldTypeConverterProcessor extends SingleLaneRecordProcessor {
         if(rootField.getValue() == null) {
           return rootField;
         }
-        for (Map.Entry<String, Field> entry : rootField.getValueAsMap().entrySet()) {
-          entry.setValue(processByType(matchingPath + "/" + entry.getKey(), entry.getValue()));
+        Map<String, Field> fieldMap = rootField.getValueAsMap();
+        List<String> fieldsToRemove = new LinkedList<>();
+        for (Map.Entry<String, Field> entry : fieldMap.entrySet()) {
+          Field convertedField = processByType(matchingPath + "/" + entry.getKey(), entry.getValue());
+          if (convertedField == null) {
+            fieldsToRemove.add(entry.getKey());
+          } else {
+            entry.setValue(convertedField);
+          }
+        }
+        for (String key : fieldsToRemove) {
+          fieldMap.remove(key);
         }
         break;
       case LIST:
@@ -126,8 +139,18 @@ public class FieldTypeConverterProcessor extends SingleLaneRecordProcessor {
           return rootField;
         }
         List<Field> fields = rootField.getValueAsList();
+        LinkedList<Integer> indexToRemove = new LinkedList<>();
         for(int i = 0; i < fields.size(); i++) {
-          fields.set(i, processByType(matchingPath + "[" + i + "]", fields.get(i)));
+          Field convertedField = processByType(matchingPath + "[" + i + "]", fields.get(i));
+          if (convertedField == null) {
+            indexToRemove.add(i);
+          } else {
+            fields.set(i, convertedField);
+          }
+        }
+        Iterator<Integer> itr = indexToRemove.descendingIterator();
+        while(itr.hasNext()) {
+          fields.remove((int)itr.next());
         }
         break;
       default:
@@ -163,7 +186,12 @@ public class FieldTypeConverterProcessor extends SingleLaneRecordProcessor {
           if(field == null) {
             LOG.trace("Record does not have field {}. Ignoring conversion.", matchingField);
           } else {
-            record.set(matchingField, convertField(matchingField, field, fieldTypeConverterConfig));
+            Field convertedField = convertField(matchingField, field, fieldTypeConverterConfig);
+            if (convertedField == null) {
+              record.delete(matchingField);
+            } else {
+              record.set(matchingField, convertedField);
+            }
           }
         }
       }
@@ -183,6 +211,7 @@ public class FieldTypeConverterProcessor extends SingleLaneRecordProcessor {
           }
           return convertStringToTargetType(field,
               converterConfig.targetType,
+              converterConfig.inputFieldEmpty,
               converterConfig.getLocale(),
               dateMask,
               converterConfig.scale,
@@ -313,6 +342,7 @@ public class FieldTypeConverterProcessor extends SingleLaneRecordProcessor {
   private Field convertStringToTargetType(
       Field field,
       Field.Type targetType,
+      InputFieldEmpty inputFieldEmpty,
       Locale dataLocale,
       String dateMask,
       int scale,
@@ -320,6 +350,32 @@ public class FieldTypeConverterProcessor extends SingleLaneRecordProcessor {
       DateTimeFormatter dateTimeFormatter
   ) throws ParseException {
     String stringValue = field.getValueAsString();
+    if (!inputFieldEmpty.equals(InputFieldEmpty.ERROR)) {
+      if (stringValue.isEmpty() && targetType.isOneOf(Field.Type.BYTE,
+          Field.Type.CHAR,
+          Field.Type.DATE,
+          Field.Type.DATETIME,
+          Field.Type.TIME,
+          Field.Type.ZONED_DATETIME,
+          Field.Type.DECIMAL,
+          Field.Type.DOUBLE,
+          Field.Type.FLOAT,
+          Field.Type.INTEGER,
+          Field.Type.LONG,
+          Field.Type.SHORT
+      )) {
+        switch (inputFieldEmpty) {
+          case NULL:
+            return Field.create(targetType, null);
+          case DELETE:
+            return null;
+          case IGNORE:
+            return field;
+          default:
+            break;
+        }
+      }
+    }
     switch(targetType) {
       case BOOLEAN:
         return Field.create(Field.Type.BOOLEAN, Boolean.valueOf(stringValue.trim()));

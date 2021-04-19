@@ -53,6 +53,24 @@ public class BaseConverterConfig {
 
   @ConfigDef(
       required = true,
+      type = ConfigDef.Type.MODEL,
+      defaultValue="ERROR",
+      label = "Source Field is Empty",
+      description = "Action to take when the source field is an empty string.",
+      displayPosition = 20,
+      displayMode = ConfigDef.DisplayMode.BASIC,
+      dependsOn = "targetType",
+      group = "TYPE_CONVERSION",
+      triggeredByValue = {
+          "BYTE", "CHAR", "DATE", "DATETIME", "TIME", "ZONED_DATETIME",
+          "DECIMAL", "DOUBLE", "FLOAT", "INTEGER", "LONG", "SHORT"
+      }
+  )
+  @ValueChooserModel(InputFieldEmptyChooserValues.class)
+  public InputFieldEmpty inputFieldEmpty = InputFieldEmpty.ERROR;
+
+  @ConfigDef(
+      required = true,
       type = ConfigDef.Type.BOOLEAN,
       defaultValue = "false",
       label = "Treat Input Field as Date",

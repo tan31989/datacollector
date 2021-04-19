@@ -16,5 +16,18 @@
 
 upgraderVersion: 1
 
-# No upgrade rules defined
-upgrades: []
+upgrades:
+  - toVersion: 3
+    actions:
+      - iterateListConfig:
+          name: fieldTypeConverterConfigs
+          actions:
+            - setConfig:
+                name: inputFieldEmpty
+                value: ERROR
+      - iterateListConfig:
+          name: wholeTypeConverterConfigs
+          actions:
+            - setConfig:
+                name: inputFieldEmpty
+                value: ERROR
