@@ -23,6 +23,7 @@ import com.streamsets.datacollector.tunneling.TunnelingConstants;
 import com.streamsets.datacollector.tunneling.TunnelingRequest;
 import com.streamsets.datacollector.tunneling.TunnelingResponse;
 import com.streamsets.datacollector.util.Configuration;
+import com.streamsets.datacollector.util.ContainerError;
 import com.streamsets.lib.security.http.DpmClientInfo;
 import com.streamsets.lib.security.http.SSOConstants;
 import com.streamsets.pipeline.lib.executor.SafeScheduledExecutorService;
@@ -101,18 +102,21 @@ public class WebSocketToRestDispatcher {
 
   public void runTask() {
     if (isTunnelingEnabled()) {
+      LOG.info("Connecting to the Control Hub Tunneling application to establish a WebSocket session for " +
+          "Control Hub UI to engine communication.");
+      // Disable static web content when connected to the latest Control Hub instance
+      runtimeInfo.setStaticWebDisabled(true);
       try {
         this.httpClient = ClientBuilder.newClient()
             .property(ClientProperties.SUPPRESS_HTTP_COMPLIANCE_VALIDATION, true);
 
         boolean connected = this.connectToControlHubTunnelingApp(false);
         if (connected) {
+          LOG.info(ContainerError.CONTAINER_01800.getMessage());
+          System.out.println(ContainerError.CONTAINER_01800.getMessage());
           // Keep the WebSocket Connection open by sending a ping message every two minutes.
           long interval = conf.get(TUNNELING_PING_INTERVAL_CONFIG, TUNNELING_PING_INTERVAL_CONFIG_DEFAULT);
           executorService.scheduleAtFixedRate(this::sendPing, 120, interval, TimeUnit.SECONDS);
-
-          // Disable static web content when connected to the latest Control Hub instance
-          runtimeInfo.setStaticWebDisabled(true);
         }
       } catch (Exception e) {
         LOG.error(e.getMessage(), e);
@@ -128,7 +132,7 @@ public class WebSocketToRestDispatcher {
       try {
         this.webSocketClient.stop();
       } catch (Exception e) {
-        LOG.error(e.getMessage(), e);
+        LOG.error(ContainerError.CONTAINER_01802.getMessage(), e.getMessage(), e);
       }
     }
     try {
@@ -155,7 +159,7 @@ public class WebSocketToRestDispatcher {
       this.webSocketClient.connect(this, webSocketUri, request).get();
       return true;
     } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+      LOG.error(ContainerError.CONTAINER_01801.getMessage(), e.getMessage(), e);
       return false;
     }
   }
@@ -282,11 +286,10 @@ public class WebSocketToRestDispatcher {
       try {
         this.wsSession.getRemote().sendString(PING_MESSAGE);
       } catch (IOException e) {
-        LOG.error("Failed to send ping message: {}", e.getMessage(), e);
+        LOG.error(ContainerError.CONTAINER_01803.getMessage(), e.getMessage(), e);
       }
     } else {
-      LOG.warn("Failed to send a ping message to Control Hub Tunneling application, reason: Connection Not open. " +
-          "Invoking reconnect method to reopen the connection.");
+      LOG.warn(ContainerError.CONTAINER_01804.getMessage());
       this.connectToControlHubTunnelingApp(true);
     }
   }
@@ -296,7 +299,7 @@ public class WebSocketToRestDispatcher {
       try {
         this.webSocketClient.stop();
       } catch (Exception e) {
-        LOG.error("Failed to stop WebSocket Client: {}", e.getMessage(), e);
+        LOG.error(ContainerError.CONTAINER_01802.getMessage(), e.getMessage(), e);
       }
     }
   }
@@ -327,7 +330,7 @@ public class WebSocketToRestDispatcher {
         List<String> availableApps = response.readEntity(new GenericType<List<String>>() {});
         enabled = availableApps.contains(TUNNELING_APP_NAME);
       } catch (Exception e) {
-        LOG.warn("Exception during fetching all available apps from Control Hub: {}", e.getMessage(), e);
+        LOG.warn(ContainerError.CONTAINER_01805.getMessage(), e.getMessage(), e);
         return false;
       } finally {
         if (response != null) {

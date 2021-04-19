@@ -187,6 +187,16 @@ public enum ContainerError implements ErrorCode {
 
 
   CONTAINER_01700("Publishing pipeline to Control Hub failed, status code '{}': {}"),
+
+  // WebSocketToRestDispatcher
+  CONTAINER_01800("Successfully connected to the Control Hub Tunneling application and WebSocket session is " +
+      "active for Control Hub UI to engine communication"),
+  CONTAINER_01801("Failed to connect to Control Hub Tunneling application: {}"),
+  CONTAINER_01802("Failed to stop WebSocket Client: {}"),
+  CONTAINER_01803("Failed to send a ping message to Control Hub Tunneling application: {}"),
+  CONTAINER_01804("Failed to send a ping message to Control Hub Tunneling application, reason: " +
+      "Connection not open. Invoking reconnect method to reopen the connection."),
+  CONTAINER_01805("Exception while fetching all available applications from Control Hub: {}"),
   ;
 
   private final String msg;
