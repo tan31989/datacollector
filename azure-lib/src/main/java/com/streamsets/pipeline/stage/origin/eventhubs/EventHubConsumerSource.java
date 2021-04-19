@@ -125,14 +125,12 @@ public class EventHubConsumerSource implements PushSource, IEventProcessorFactor
           consumerConfigBean.storageAccountName + ";AccountKey=" + consumerConfigBean.storageAccountKey.get();
 
       for (int i = 0; i < consumerConfigBean.maxThreads; i++) {
-        EventProcessorHost eventProcessorHost = new EventProcessorHost(
-            consumerConfigBean.hostNamePrefix + i,
-            commonConf.eventHubName,
-            consumerConfigBean.consumerGroup,
-            eventHubConnectionString.toString(),
-            storageConnectionString,
-            consumerConfigBean.storageContainerName
-        );
+        EventProcessorHost eventProcessorHost = EventProcessorHost.EventProcessorHostBuilder
+            .newBuilder(consumerConfigBean.hostNamePrefix + i, consumerConfigBean.consumerGroup)
+            .useAzureStorageCheckpointLeaseManager(storageConnectionString, consumerConfigBean.storageContainerName,
+                null)
+            .useEventHubConnectionString(eventHubConnectionString.toString(), commonConf.eventHubName)
+            .build();
 
         EventProcessorOptions eventProcessorOptions = new EventProcessorOptions();
         eventProcessorOptions.setExceptionNotification(this);

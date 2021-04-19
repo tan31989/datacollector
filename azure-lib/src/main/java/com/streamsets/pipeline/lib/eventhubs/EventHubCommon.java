@@ -49,7 +49,7 @@ public class EventHubCommon {
         new ThreadFactoryBuilder().setNameFormat(threadNamePattern).build()
     );
 
-    return EventHubClient.createSync(connStr.toString(), scheduledExecutorService);
+    return EventHubClient.createFromConnectionStringSync(connStr.toString(), scheduledExecutorService);
   }
 
 }
