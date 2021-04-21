@@ -231,9 +231,9 @@ public class FieldMapperProcessor extends SingleLaneRecordProcessor {
       )) {
         return;
       }
-      if (fieldMapperConfig.operateOn == OperateOn.FIELD_NAMES && fv.getParentField() != null
-          && fv.getParentField().getType() == Field.Type.LIST) {
-        // we are operating on field names, and the parent is a list, which means this field is an item in the list
+      if (fieldMapperConfig.operateOn == OperateOn.FIELD_NAMES &&
+          (fv.getParentField() == null || fv.getParentField().getType() == Field.Type.LIST)) {
+        // we are operating on field names, and this field is either the root field (has no name) or an item in a list
         // don't attempt to rename this field, since it's nonsensical (the list field itself will be handled on its own
         // visit)
         return;
