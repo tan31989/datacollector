@@ -34,6 +34,7 @@ public interface JdbcRunnable {
 
   /**
    * If "schema change" configuration is enabled, then check and generate schema change event
+   * @return
    */
-  void generateSchemaChanges(BatchContext batchContext) throws SQLException;
+  boolean generateSchemaChanges(BatchContext batchContext) throws SQLException;
 }

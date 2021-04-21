@@ -25,8 +25,6 @@ import com.streamsets.pipeline.api.Field;
 import com.streamsets.pipeline.api.PushSource;
 import com.streamsets.pipeline.api.Record;
 import com.streamsets.pipeline.api.StageException;
-import com.streamsets.pipeline.lib.jdbc.JdbcErrors;
-import com.streamsets.pipeline.lib.jdbc.JdbcUtil;
 import com.streamsets.pipeline.lib.jdbc.MSOperationCode;
 import com.streamsets.pipeline.lib.jdbc.multithread.util.OffsetQueryUtil;
 import com.streamsets.pipeline.lib.operation.OperationType;
@@ -152,7 +150,7 @@ public final class CTJdbcRunnable extends JdbcBaseRunnable {
   }
 
   @Override
-  public void generateSchemaChanges(BatchContext batchContext) throws SQLException {
-    // no-op
+  public boolean generateSchemaChanges(BatchContext batchContext) throws SQLException {
+    return false;
   }
 }

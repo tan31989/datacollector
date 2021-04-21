@@ -121,7 +121,7 @@ public class TableJdbcRunnable extends JdbcBaseRunnable {
   }
 
   @Override
-  public void generateSchemaChanges(BatchContext batchContext) throws SQLException {
-    // no-op
+  public boolean generateSchemaChanges(BatchContext batchContext) throws SQLException {
+    return false;
   }
 }

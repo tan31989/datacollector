@@ -25,8 +25,6 @@ import com.streamsets.pipeline.api.Field;
 import com.streamsets.pipeline.api.PushSource;
 import com.streamsets.pipeline.api.Record;
 import com.streamsets.pipeline.api.StageException;
-import com.streamsets.pipeline.lib.jdbc.JdbcErrors;
-import com.streamsets.pipeline.lib.jdbc.JdbcUtil;
 import com.streamsets.pipeline.lib.jdbc.MSOperationCode;
 import com.streamsets.pipeline.lib.jdbc.multithread.util.MSQueryUtil;
 import com.streamsets.pipeline.lib.jdbc.multithread.util.OffsetQueryUtil;
@@ -53,6 +51,7 @@ public class CDCJdbcRunnable extends JdbcBaseRunnable {
 
   private final Set<String> recordHeader;
   private final Map<String, SQLServerCDCSource.SourceTableInfo> infoMap;
+  private Map<String, Integer> latestCdcTableColumnInfo;
 
   protected static final String CDC_NAMESPACE_HEADER = "cdc.";
 
@@ -93,6 +92,7 @@ public class CDCJdbcRunnable extends JdbcBaseRunnable {
         MSQueryUtil.CDC_COMMAND_ID
     );
     this.infoMap = infoMap;
+    this.latestCdcTableColumnInfo = new HashMap<>();
   }
 
   @Override
@@ -206,12 +206,13 @@ public class CDCJdbcRunnable extends JdbcBaseRunnable {
   }
 
   @Override
-  public void generateSchemaChanges(BatchContext batchContext) throws SQLException {
+  public boolean generateSchemaChanges(BatchContext batchContext) throws SQLException {
     Map<String, Integer> source = new HashMap<>();
     ResultSet rs = tableReadContext.getMoreResultSet();
     String schemaName = "";
     String tableName = "";
     String captureInstanceName = "";
+    boolean schemaChanges = false;
 
     if (rs != null && rs.next()) {
       ResultSetMetaData data = rs.getMetaData();
@@ -230,7 +231,12 @@ public class CDCJdbcRunnable extends JdbcBaseRunnable {
         }
       }
 
-      boolean schemaChanges = getDiff(captureInstanceName, source, tableRuntimeContext.getSourceTableContext().getColumnToType());
+      if (latestCdcTableColumnInfo.isEmpty()){
+        schemaChanges = getDiff(captureInstanceName, source, tableRuntimeContext.getSourceTableContext().getColumnToType());
+        latestCdcTableColumnInfo = tableRuntimeContext.getSourceTableContext().getColumnToType();
+      } else {
+        schemaChanges = getDiff(captureInstanceName, source, latestCdcTableColumnInfo);
+      }
 
       if (schemaChanges) {
         JdbcEvents.SCHEMA_CHANGE.create(context, batchContext)
@@ -238,9 +244,10 @@ public class CDCJdbcRunnable extends JdbcBaseRunnable {
             .with("source-table-name", tableName)
             .with("capture-instance-name", captureInstanceName)
             .createAndSend();
-        context.processBatch(batchContext);
+        latestCdcTableColumnInfo = source;
       }
     }
+    return schemaChanges;
   }
 
   private boolean getDiff(String captureInstanceName, Map<String, Integer> sourceTableColumnInfo, Map<String, Integer> cdcTableColumnInfo) {
