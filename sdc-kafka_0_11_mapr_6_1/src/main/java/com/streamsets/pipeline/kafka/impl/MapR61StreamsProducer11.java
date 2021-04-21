@@ -29,7 +29,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -122,11 +122,7 @@ public class MapR61StreamsProducer11 extends KafkaProducer09 {
   }
 
   protected void validateAdditionalProperties(List<Stage.ConfigIssue> issues, Stage.Context context) {
-    Set<String> forbiddenProperties = new HashSet<>(Arrays.asList(
-        STREAMS_PARTITIONER_CLASS,
-        ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
-        ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG
-    ));
+    Set<String> forbiddenProperties = new HashSet<>(Collections.singletonList(STREAMS_PARTITIONER_CLASS));
     forbiddenProperties.retainAll(kafkaProducerConfigs.keySet());
     if (!(overrideConfigurations || forbiddenProperties.isEmpty())) {
       issues.add(context.createConfigIssue(
