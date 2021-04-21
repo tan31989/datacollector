@@ -391,6 +391,7 @@
     "graphPane": {
       "errorStackTrace": "Error Details",
       "dontShowAgain": "Don't show again.",
+      "deprecated": "The Data Collector user interface has been deprecated and will be removed in Data Collector 5.0. We highly recommend using Control Hub to design and run your pipelines.",
       "originMissing": "Origin missing",
       "selectExecutor": "Select Executor to connect...",
       "selectProcessor": "Select Processor to connect...",
