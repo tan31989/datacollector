@@ -31,7 +31,6 @@ import com.streamsets.pipeline.api.base.configurablestage.DSource;
     description = "Processes data from a gRPC server by calling Unary RPC or Server Streaming RPC methods",
     execution = {ExecutionMode.EDGE},
     icon = "grpc.png",
-    beta = true,
     upgraderDef = "upgrader/GrpcClientDSource.yaml",
     onlineHelpRefUrl = "index.html?contextID=task_dhb_d1t_yfb"
 )

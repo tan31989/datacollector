@@ -38,6 +38,7 @@ import java.util.List;
     label = "Aerospike",
     description = "Writes data to Aerospike",
     icon = "aerospike.png",
+    beta = true,
     upgrader = AerospikeTargetUpgrader.class,
     upgraderDef = "upgrader/AerospikeDTarget.yaml",
     onlineHelpRefUrl = "index.html?contextID=task_j3q_tpr_4cb"
