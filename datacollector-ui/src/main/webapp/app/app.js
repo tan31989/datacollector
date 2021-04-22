@@ -166,6 +166,7 @@ angular.module('dataCollectorApp')
       successList: [],
       activeDetailTab: undefined,
       dontShowHelpAlert: false,
+      hideDeprecatedMsg: false,
       logEndingOffset: -1,
       fetchingLog: false,
       counters: {},

@@ -1,9 +1,23 @@
 <div class="panel panel-default graph-pane"
      ng-controller="GraphController">
 
-  <div class="alert alert-dismissible alert-warning alert-deprecated" role="alert" >
-    {{ 'home.graphPane.deprecated' | translate }}
-      </div>
+  <div class="alert alert-dismissible alert-warning alert-deprecated" ng-if="!$storage.hideDeprecatedMsg" role="alert">
+
+    <button type="button" class="close" data-dismiss="alert">
+      <span aria-hidden="true">&times;</span>
+      <span class="sr-only">Close</span>
+    </button>
+
+    <span>
+      {{ 'home.graphPane.deprecated' | translate }}
+    </span>
+    <div class="pull-right checkbox dont-show-again">
+      <label>
+        <input type="checkbox" name="dontShowHelpAgain" ng-model="$storage.hideDeprecatedMsg">
+        {{'home.graphPane.dontShowAgain' | translate}}
+      </label>
+    </div>
+  </div>
 
   <div class="panel-body" droppable drop="stageDrop">
 
