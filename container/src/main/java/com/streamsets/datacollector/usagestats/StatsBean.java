@@ -34,6 +34,7 @@ public class StatsBean {
   private String buildRepoSha;
   private Map<String, Object> extraInfo;
   private boolean dpmEnabled;
+  private boolean staticWebDisabled;
   private long startTime;
   private long endTime;
   private long upTime;
@@ -61,6 +62,7 @@ public class StatsBean {
     setBuildRepoSha(activeStats.getBuildRepoSha());
     setExtraInfo(activeStats.getExtraInfo());
     setDpmEnabled(activeStats.isDpmEnabled());
+    setStaticWebDisabled(activeStats.isStaticWebDisabled());
     setStartTime(activeStats.getStartTime());
     setEndTime(activeStats.getEndTime());
     setUpTime(activeStats.getUpTime().getAccumulatedTime());
@@ -177,6 +179,15 @@ public class StatsBean {
 
   public void setDpmEnabled(boolean dpmEnabled) {
     this.dpmEnabled = dpmEnabled;
+  }
+
+  public boolean isStaticWebDisabled() {
+    return staticWebDisabled;
+  }
+
+  public StatsBean setStaticWebDisabled(boolean staticWebDisabled) {
+    this.staticWebDisabled = staticWebDisabled;
+    return this;
   }
 
   public long getStartTime() {

@@ -46,6 +46,7 @@ public class TestStatsBean {
     ActiveStats as = new ActiveStats(ImmutableList.of(ext));
     as.setStatsInfo(si);
     as.setDpmEnabled(true);
+    as.setStaticWebDisabled(true);
     as.setDataCollectorVersion("version");
     as.setUpTime(new UsageTimer().setName("upTime").setAccumulatedTime(1));
     as.setStartTime(1);
@@ -114,7 +115,8 @@ public class TestStatsBean {
 
     Assert.assertEquals("sdcid", sb.getSdcId());
     Assert.assertEquals("version", sb.getDataCollectorVersion());
-    Assert.assertEquals(true, sb.isDpmEnabled());
+    Assert.assertTrue(sb.isDpmEnabled());
+    Assert.assertTrue(sb.isStaticWebDisabled());
     Assert.assertEquals(1, sb.getUpTime());
     Assert.assertEquals(1, sb.getStartTime());
     Assert.assertEquals(3, sb.getEndTime());
@@ -172,7 +174,8 @@ public class TestStatsBean {
 
     Assert.assertEquals("sdcid", sb.getSdcId());
     Assert.assertEquals("version", sb.getDataCollectorVersion());
-    Assert.assertEquals(true, sb.isDpmEnabled());
+    Assert.assertTrue(sb.isDpmEnabled());
+    Assert.assertFalse(sb.isStaticWebDisabled());
     Assert.assertEquals(1, sb.getUpTime());
     Assert.assertEquals(1, sb.getStartTime());
     Assert.assertEquals(3, sb.getEndTime());

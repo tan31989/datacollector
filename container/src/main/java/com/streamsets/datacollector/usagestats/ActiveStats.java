@@ -43,7 +43,7 @@ import java.util.stream.Collectors;
 public class ActiveStats {
   private final Logger LOG = LoggerFactory.getLogger(ActiveStats.class);
 
-  public static final String VERSION = "1.3";
+  public static final String VERSION = "1.4";
 
   /** In upgrade scenarios, this can differ from {@link #VERSION} until the first roll. */
   private String version;
@@ -56,6 +56,7 @@ public class ActiveStats {
   private String buildRepoSha;
   private Map<String, Object> extraInfo;
   private boolean dpmEnabled;
+  private boolean staticWebDisabled;
   private UsageTimer upTime;
   /** This should only be populated in version 1.1 or earlier (and earlier builds of 1.2). It is immediately rolled and
    * never populated again */
@@ -184,6 +185,15 @@ public class ActiveStats {
 
   public ActiveStats setDpmEnabled(boolean dpmEnabled) {
     this.dpmEnabled = dpmEnabled;
+    return this;
+  }
+
+  public boolean isStaticWebDisabled() {
+    return staticWebDisabled;
+  }
+
+  public ActiveStats setStaticWebDisabled(boolean staticWebDisabled) {
+    this.staticWebDisabled = staticWebDisabled;
     return this;
   }
 
@@ -456,6 +466,7 @@ public class ActiveStats {
         .setBuildRepoSha(getBuildRepoSha())
         .setExtraInfo(getExtraInfo())
         .setDpmEnabled(isDpmEnabled())
+        .setStaticWebDisabled(isStaticWebDisabled())
         .setUpTime(getUpTime().roll())
         .setActivationInfo(getActivationInfo());
     statsBean.setDeprecatedPipelines(
@@ -497,6 +508,7 @@ public class ActiveStats {
         .setBuildRepoSha(getBuildRepoSha())
         .setExtraInfo(getExtraInfo())
         .setDpmEnabled(isDpmEnabled())
+        .setStaticWebDisabled(isStaticWebDisabled())
         .setErrorCodes(errorCodes)
         .setUpTime(getUpTime().snapshot())
         .setRecordCount(getRecordCount())

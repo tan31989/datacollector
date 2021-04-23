@@ -398,6 +398,7 @@ public class TestActiveStats {
     as.setBuildRepoSha("sha1");
     as.setExtraInfo(ImmutableMap.of("a", "A"));
     as.setDpmEnabled(true);
+    as.setStaticWebDisabled(true);
 
     as.startSystem();
     Assert.assertEquals(1, getTestExtension(as).getStartSystems());
@@ -436,6 +437,7 @@ public class TestActiveStats {
     Assert.assertEquals("sha1", as.getBuildRepoSha());
     Assert.assertEquals(ImmutableMap.<String, Object>of("a", "A"), as.getExtraInfo());
     Assert.assertTrue(as.isDpmEnabled());
+    Assert.assertTrue(as.isStaticWebDisabled());
 
     Assert.assertTrue(as.getEndTime() >= now);
     Assert.assertEquals(0, as.getUpTime().getMultiplier());
@@ -522,6 +524,7 @@ public class TestActiveStats {
     Assert.assertEquals("sha1", as.getBuildRepoSha());
     Assert.assertEquals(ImmutableMap.<String, Object>of("a", "A"), as.getExtraInfo());
     Assert.assertTrue(as.isDpmEnabled());
+    Assert.assertFalse(as.isStaticWebDisabled());
 
     Assert.assertTrue(as.getEndTime() >= now);
     Assert.assertEquals(0, as.getUpTime().getMultiplier());
@@ -559,6 +562,7 @@ public class TestActiveStats {
     as.setDataCollectorVersion("v1");
     as.setBuildRepoSha("sha1");
     as.setDpmEnabled(true);
+    as.setStaticWebDisabled(true);
     as.setExtraInfo(ImmutableMap.of("a", "A"));
     as.startSystem();
     long startTime = as.getStartTime();
@@ -582,7 +586,8 @@ public class TestActiveStats {
     Assert.assertEquals("v1", as.getDataCollectorVersion());
     Assert.assertEquals("sha1", as.getBuildRepoSha());
     Assert.assertEquals(ImmutableMap.of("a", "A"), as.getExtraInfo());
-    Assert.assertEquals(true, as.isDpmEnabled());
+    Assert.assertTrue(as.isDpmEnabled());
+    Assert.assertTrue(as.isStaticWebDisabled());
 
     Assert.assertEquals(startTime, as.getStartTime());
     Assert.assertEquals(0, as.getEndTime());
@@ -642,6 +647,7 @@ public class TestActiveStats {
     Assert.assertEquals("sha1", as.getBuildRepoSha());
     Assert.assertEquals(ImmutableMap.of("a", "A"), as.getExtraInfo());
     Assert.assertEquals(true, as.isDpmEnabled());
+    Assert.assertFalse(as.isStaticWebDisabled());
 
     Assert.assertEquals(startTime, as.getStartTime());
     Assert.assertEquals(0, as.getEndTime());

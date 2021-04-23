@@ -156,6 +156,7 @@ public class TestStatsInfo {
     Mockito.when(buildInfo.getVersion()).thenReturn("v1");
     Mockito.when(buildInfo.getBuiltRepoSha()).thenReturn("sha1");
     RuntimeInfo runtimeInfo = mockRuntimeInfo("id", true);
+    Mockito.when(runtimeInfo.isStaticWebDisabled()).thenReturn(true);
 
     StatsInfo si = createStatsInfo();
     si = Mockito.spy(si);
@@ -172,6 +173,7 @@ public class TestStatsInfo {
 
     Assert.assertEquals("v1", si.getActiveStats().getDataCollectorVersion());
     Assert.assertTrue(si.getActiveStats().isDpmEnabled());
+    Assert.assertTrue(si.getActiveStats().isStaticWebDisabled());
     Assert.assertTrue(si.getCollectedStats().isEmpty());
 
     Assert.assertEquals(1, si.getActiveStats().getUpTime().getMultiplier());
@@ -328,6 +330,7 @@ public class TestStatsInfo {
 
     Assert.assertEquals("v1", si.getActiveStats().getDataCollectorVersion());
     Assert.assertTrue(si.getActiveStats().isDpmEnabled());
+    Assert.assertFalse(si.getActiveStats().isStaticWebDisabled());
     Assert.assertEquals(1, si.getCollectedStats().size());
   }
 

@@ -50,6 +50,7 @@ public class StatsInfo {
   public static final String DATA_COLLECTOR_VERSION = "dataCollectorVersion";
   public static final String BUILD_REPO_SHA = "buildRepoSha";
   public static final String DPM_ENABLED = "dpmEnabled";
+  public static final String STATIC_WEB_DISABLED = "staticWebDisabled";
   public static final String EXTRA_INFO = "extraInfo";
 
   public static final long PERIOD_OF_TIME_TO_KEEP_STATS_IN_MILLIS = TimeUnit.DAYS.toMillis(90);
@@ -180,6 +181,7 @@ public class StatsInfo {
         .put(DATA_COLLECTOR_VERSION, buildInfo.getVersion())
         .put(BUILD_REPO_SHA, buildInfo.getBuiltRepoSha())
         .put(DPM_ENABLED, runtimeInfo.isDPMEnabled())
+        .put(STATIC_WEB_DISABLED, runtimeInfo.isStaticWebDisabled())
         .put(EXTRA_INFO, getExtraInfo(sysInfo))
         .put(ActivationInfo.class.getCanonicalName(), new ActivationInfo(activation))
         .build();
@@ -199,6 +201,7 @@ public class StatsInfo {
     Optional.ofNullable(stats.getExtraInfo()).ifPresent(s -> systemInfoBuilder.put(EXTRA_INFO, s));
     systemInfoBuilder.put(ActivationInfo.class.getCanonicalName(), stats.getActivationInfo());
     systemInfoBuilder.put(DPM_ENABLED, stats.isDpmEnabled());
+    systemInfoBuilder.put(STATIC_WEB_DISABLED, stats.isStaticWebDisabled());
     return systemInfoBuilder.build();
   }
 
@@ -208,6 +211,7 @@ public class StatsInfo {
     stats.setDataCollectorVersion((String) info.get(DATA_COLLECTOR_VERSION));
     stats.setBuildRepoSha((String) info.get(BUILD_REPO_SHA));
     stats.setDpmEnabled((Boolean) info.get(DPM_ENABLED));
+    stats.setStaticWebDisabled(((Boolean) info.get(STATIC_WEB_DISABLED)));
     stats.setExtraInfo((Map<String, Object>) info.get(EXTRA_INFO));
     stats.setActivationInfo((ActivationInfo) info.get(ActivationInfo.class.getCanonicalName()));
   }
