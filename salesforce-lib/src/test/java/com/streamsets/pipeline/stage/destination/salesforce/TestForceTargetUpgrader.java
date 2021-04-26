@@ -116,4 +116,15 @@ public class TestForceTargetUpgrader {
 
     UpgraderTestUtils.assertExists(configs, "forceConfig.connection.authType", "BASIC");
   }
+
+  @Test
+  public void testV4toV5Upgrade() {
+    Mockito.doReturn(4).when(context).getFromVersion();
+    Mockito.doReturn(5).when(context).getToVersion();
+
+    configs = upgrader.upgrade(configs, context);
+
+    UpgraderTestUtils.assertExists(configs, "forceConfig.connection.subscribeTimeout", 10);
+    UpgraderTestUtils.assertExists(configs, "forceConfig.connection.handshakeTimeout", 10);
+  }
 }

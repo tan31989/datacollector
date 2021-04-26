@@ -162,4 +162,15 @@ public class TestForceLookupProcessorUpgrader extends TestForceInputUpgrader {
 
     UpgraderTestUtils.assertExists(configs, "forceConfig.connection.authType", "BASIC");
   }
+
+  @Test
+  public void testV6toV7Upgrade() {
+    Mockito.doReturn(6).when(context).getFromVersion();
+    Mockito.doReturn(7).when(context).getToVersion();
+
+    configs = upgrader.upgrade(configs, context);
+
+    UpgraderTestUtils.assertExists(configs, "forceConfig.connection.subscribeTimeout", 10);
+    UpgraderTestUtils.assertExists(configs, "forceConfig.connection.handshakeTimeout", 10);
+  }
 }

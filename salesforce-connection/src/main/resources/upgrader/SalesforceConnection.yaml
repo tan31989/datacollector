@@ -22,3 +22,11 @@ upgrades:
       - setConfig:
           name: authType
           value: "BASIC"
+  - toVersion: 3
+    actions:
+      - setConfig:
+          name: subscribeTimeout
+          value: 10
+      - setConfig:
+          name: handshakeTimeout
+          value: 10

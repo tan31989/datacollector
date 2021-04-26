@@ -25,7 +25,7 @@ import com.streamsets.pipeline.api.base.configurablestage.DProcessor;
 import com.streamsets.pipeline.lib.salesforce.ForceLookupConfigBean;
 
 @StageDef(
-    version = 6,
+    version = 7,
     label = "Salesforce Lookup",
     description = "Lookup records in Salesforce to enrich records",
     icon = "salesforce.png",

@@ -95,4 +95,12 @@ upgrades:
       - setConfig:
           name: conf.connection.authType
           value: "BASIC"
+  - toVersion: 6
+    actions:
+      - setConfig:
+          name: conf.connection.subscribeTimeout
+          value: 10
+      - setConfig:
+          name: conf.connection.handshakeTimeout
+          value: 10
 

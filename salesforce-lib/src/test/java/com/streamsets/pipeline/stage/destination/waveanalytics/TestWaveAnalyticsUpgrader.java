@@ -177,4 +177,15 @@ public class TestWaveAnalyticsUpgrader {
 
     UpgraderTestUtils.assertExists(configs, "conf.connection.authType", "BASIC");
   }
+
+  @Test
+  public void testV5toV6Upgrade() {
+    Mockito.doReturn(5).when(context).getFromVersion();
+    Mockito.doReturn(6).when(context).getToVersion();
+
+    configs = upgrader.upgrade(configs, context);
+
+    UpgraderTestUtils.assertExists(configs, "conf.connection.subscribeTimeout", 10);
+    UpgraderTestUtils.assertExists(configs, "conf.connection.handshakeTimeout", 10);
+  }
 }

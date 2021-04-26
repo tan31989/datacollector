@@ -48,7 +48,7 @@ import java.util.Date;
     label = "Salesforce",
     type = SalesforceConnection.TYPE,
     description = "Connects to Salesforce and Salesforce Einstein Analytics",
-    version = 2,
+    version = 3,
     upgraderDef = "upgrader/SalesforceConnection.yaml",
     supportedEngines = { ConnectionEngine.COLLECTOR }
 )
@@ -240,6 +240,30 @@ public class SalesforceConnection {
       }
   )
   public CredentialValue proxyPassword;
+
+  @ConfigDef(
+      required = true,
+      type = ConfigDef.Type.NUMBER,
+      label = "Subscribe Timeout",
+      description = "Maximum time in seconds to allow for subscribing to a Salesforce channel",
+      defaultValue = "10",
+      displayPosition = 10000,
+      displayMode = ConfigDef.DisplayMode.ADVANCED,
+      group = "FORCE"
+  )
+  public int subscribeTimeout;
+
+  @ConfigDef(
+      required = true,
+      type = ConfigDef.Type.NUMBER,
+      label = "Connection Handshake Timeout",
+      description = "Maximum time in seconds to wait for a Salesforce connection handshake",
+      defaultValue = "10",
+      displayPosition = 10005,
+      displayMode = ConfigDef.DisplayMode.ADVANCED,
+      group = "FORCE"
+  )
+  public int handshakeTimeout;
 
   @ConfigDefBean(groups = "ADVANCED")
   public MutualAuthConfigBean mutualAuth = new MutualAuthConfigBean();

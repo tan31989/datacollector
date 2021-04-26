@@ -51,4 +51,14 @@ public class SalesforceConnectionUpgraderTest {
     UpgraderTestUtils.assertExists(configs, "authType", "BASIC");
   }
 
+  @Test
+  public void testV2toV3Upgrade() {
+    Mockito.doReturn(2).when(context).getFromVersion();
+    Mockito.doReturn(3).when(context).getToVersion();
+
+    configs = upgrader.upgrade(configs, context);
+
+    UpgraderTestUtils.assertExists(configs, "subscribeTimeout", 10);
+    UpgraderTestUtils.assertExists(configs, "handshakeTimeout", 10);
+  }
 }

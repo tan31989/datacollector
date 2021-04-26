@@ -57,12 +57,13 @@ public class ForceStreamConsumer {
   // The long poll duration.
   private static final int CONNECTION_TIMEOUT = 20 * 1000;  // milliseconds
   private static final int READ_TIMEOUT = 120 * 1000; // milliseconds
-  private static final int SUBSCRIBE_TIMEOUT = 10 * 1000; // milliseconds
 
   private final PartnerConnection connection;
   private final String bayeuxChannel;
   private final String streamingEndpointPath;
   private final ForceSourceConfigBean conf;
+  private final int subscribeTimeout; // milliseconds
+  private final int handshakeTimeout; // milliseconds
 
   private HttpClient httpClient;
   private BayeuxClient client;
@@ -101,6 +102,8 @@ public class ForceStreamConsumer {
     }
     String streamingEndpointPrefix = conf.connection.apiVersion.equals("36.0") ? "/cometd/replay/" : "/cometd/";
     this.streamingEndpointPath = streamingEndpointPrefix + conf.connection.apiVersion;
+    this.subscribeTimeout = conf.connection.subscribeTimeout * 1000;
+    this.handshakeTimeout = conf.connection.handshakeTimeout * 1000;
   }
 
   private boolean isReplayIdExpired(String message) {
@@ -138,7 +141,7 @@ public class ForceStreamConsumer {
     });
 
     long start = System.currentTimeMillis();
-    while (!subscribed.get() && System.currentTimeMillis() - start < SUBSCRIBE_TIMEOUT) {
+    while (!subscribed.get() && System.currentTimeMillis() - start < subscribeTimeout) {
       Thread.sleep(1000);
     }
   }
@@ -218,7 +221,7 @@ public class ForceStreamConsumer {
     client.handshake();
     LOG.info("Waiting for handshake");
 
-    boolean handshaken = client.waitFor(10 * 1000, BayeuxClient.State.CONNECTED);
+    boolean handshaken = client.waitFor(handshakeTimeout, BayeuxClient.State.CONNECTED);
     if (!handshaken) {
       LOG.error("Failed to handshake: " + client);
       throw new StageException(Errors.FORCE_09, "Timed out waiting for handshake");
