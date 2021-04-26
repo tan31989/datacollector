@@ -34,6 +34,7 @@ import com.streamsets.datacollector.event.dto.PipelineStatusEvents;
 import com.streamsets.datacollector.event.dto.PipelineStopAndDeleteEvent;
 import com.streamsets.datacollector.event.dto.PipelineStopEvent;
 import com.streamsets.datacollector.event.dto.PipelineValidateEvent;
+import com.streamsets.datacollector.event.dto.RestartEngineEvent;
 import com.streamsets.datacollector.event.dto.SDCInfoEvent;
 import com.streamsets.datacollector.event.dto.SDCProcessMetricsEvent;
 import com.streamsets.datacollector.event.dto.SaveConfigurationEvent;
@@ -58,6 +59,7 @@ import com.streamsets.datacollector.event.json.PipelineStatusEventsJson;
 import com.streamsets.datacollector.event.json.PipelineStopAndDeleteEventJson;
 import com.streamsets.datacollector.event.json.PipelineStopEventJson;
 import com.streamsets.datacollector.event.json.PipelineValidateEventJson;
+import com.streamsets.datacollector.event.json.RestartEngineEventJson;
 import com.streamsets.datacollector.event.json.SDCInfoEventJson;
 import com.streamsets.datacollector.event.json.SDCProcessMetricsEventJson;
 import com.streamsets.datacollector.event.json.SaveConfigurationEventJson;
@@ -85,6 +87,10 @@ public abstract class MessagingDtoJsonMapper {
   public abstract PipelineStartEvent asPipelineStartEventDto(PipelineStartEventJson pipelineActionEventJson);
 
   public abstract PipelineStartEventJson toPipelineStartEventJson(PipelineStartEvent event);
+
+  public abstract RestartEngineEvent asRestartEngineEventDto(RestartEngineEventJson pipelineResetEventJson);
+
+  public abstract RestartEngineEventJson toRestartEngineEventJson(RestartEngineEvent event);
 
   public abstract PipelineStartEvent.InterceptorConfiguration asInterceptorConfigurationDto(
     PipelineStartEventJson.InterceptorConfigurationJson json

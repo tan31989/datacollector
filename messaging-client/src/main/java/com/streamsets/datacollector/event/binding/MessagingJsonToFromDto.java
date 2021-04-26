@@ -43,6 +43,7 @@ import com.streamsets.datacollector.event.dto.PipelineStatusEvents;
 import com.streamsets.datacollector.event.dto.PipelineStopAndDeleteEvent;
 import com.streamsets.datacollector.event.dto.PipelineStopEvent;
 import com.streamsets.datacollector.event.dto.PipelineValidateEvent;
+import com.streamsets.datacollector.event.dto.RestartEngineEvent;
 import com.streamsets.datacollector.event.dto.SDCInfoEvent;
 import com.streamsets.datacollector.event.dto.SDCProcessMetricsEvent;
 import com.streamsets.datacollector.event.dto.SaveConfigurationEvent;
@@ -69,6 +70,7 @@ import com.streamsets.datacollector.event.json.PipelineStatusEventsJson;
 import com.streamsets.datacollector.event.json.PipelineStopAndDeleteEventJson;
 import com.streamsets.datacollector.event.json.PipelineStopEventJson;
 import com.streamsets.datacollector.event.json.PipelineValidateEventJson;
+import com.streamsets.datacollector.event.json.RestartEngineEventJson;
 import com.streamsets.datacollector.event.json.SDCInfoEventJson;
 import com.streamsets.datacollector.event.json.SDCProcessMetricsEventJson;
 import com.streamsets.datacollector.event.json.SaveConfigurationEventJson;
@@ -303,6 +305,11 @@ public class MessagingJsonToFromDto {
             inst.asDisconectedSsoCredentialsDto(ssoEvent),
             ssoEvent
         );
+      case RESTART_ENGINE:
+        RestartEngineEventJson restartEvent = (RestartEngineEventJson) eventJsonSupplierImpl.supplyJson(
+            RestartEngineEventJson.class
+        );
+        return new AbstractMap.SimpleImmutableEntry(inst.asRestartEngineEventDto(restartEvent), restartEvent);
       default:
         throw new IllegalStateException("Unrecognized event type: " + eventType);
     }
@@ -383,6 +390,9 @@ public class MessagingJsonToFromDto {
         break;
       case SSO_DISCONNECTED_MODE_CREDENTIALS:
         eventJson = mapper.toDisconectedSsoCredentialsJson((DisconnectedSsoCredentialsEvent) event);
+        break;
+      case RESTART_ENGINE:
+        eventJson = mapper.toRestartEngineEventJson((RestartEngineEvent) event);
         break;
       default:
         throw new IllegalStateException("Unrecognized event type: " + clientEvent.getEventType());

@@ -91,6 +91,7 @@ import com.streamsets.lib.security.http.RemoteSSOService;
 import com.streamsets.lib.security.http.SSOConstants;
 import com.streamsets.pipeline.api.impl.Utils;
 import com.streamsets.pipeline.lib.executor.SafeScheduledExecutorService;
+import com.streamsets.pipeline.lib.util.ThreadUtil;
 import com.sun.management.OperatingSystemMXBean;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
@@ -112,7 +113,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -665,11 +668,30 @@ public class RemoteEventHandlerTask extends AbstractTask implements EventHandler
             (DisconnectedSsoCredentialsEvent) event
         );
         break;
+      case RESTART_ENGINE:
+        // not using the executorService from the tasks because it is shutdownNow() as apart of the shutdown process
+        ScheduledExecutorService execService = createShutdownExecutorService();
+        execService.schedule(
+            () -> {
+              LOG.info("Initiating restart requested by SCH");
+              runtimeInfo.shutdown(88);
+              },
+            5,
+            TimeUnit.SECONDS
+        );
+        // will shutdown after the scheduled runnable executes.
+        execService.shutdown();
+        break;
       default:
         result = RemoteDataCollectorResult.error(Utils.format("Unrecognized event: '{}'", eventType));
         break;
     }
     return result;
+  }
+
+  @VisibleForTesting
+  ScheduledExecutorService createShutdownExecutorService() {
+    return new SafeScheduledExecutorService(1, "restart-engine");
   }
 
   @Nullable

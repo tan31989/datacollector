@@ -121,6 +121,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -1555,4 +1557,46 @@ public class TestRemoteEventHandler {
         );
   }
 
+  @Test
+  public void testRestartEngineEvent() {
+    ScheduledExecutorService executorService = Mockito.mock(ScheduledExecutorService.class);
+    RuntimeInfo runtimeInfo = Mockito.mock(RuntimeInfo.class);
+    RemoteDataCollector remoteDataCollector = Mockito.mock(RemoteDataCollector.class);
+    Configuration conf = new Configuration();
+    conf.set(RemoteEventHandlerTask.SHOULD_SEND_SYNC_EVENTS, true);
+    RemoteEventHandlerTask remoteEventHandlerTask = new RemoteEventHandlerTask(
+        remoteDataCollector,
+        Mockito.mock(SafeScheduledExecutorService.class),
+        Mockito.mock(SafeScheduledExecutorService.class),
+        Mockito.mock(StageLibraryTask.class),
+        buildInfo,
+        runtimeInfo,
+        conf
+    );
+    remoteEventHandlerTask = Mockito.spy(remoteEventHandlerTask);
+    Mockito.doReturn(executorService).when(remoteEventHandlerTask).createShutdownExecutorService();
+
+    RemoteDataCollectorResult result = remoteEventHandlerTask.handleRemoteEvent(
+        null,
+        EventType.RESTART_ENGINE,
+        null
+    );
+    Assert.assertNull(result.getFutureAck());
+    Assert.assertNull(result.getImmediateResult());
+    Assert.assertFalse(result.isError());
+    Assert.assertNull(result.getErrorMessage());
+
+    ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+    Mockito.verify(executorService, Mockito.times(1)).schedule(
+        runnableCaptor.capture(),
+        Mockito.eq(5L),
+        Mockito.eq(TimeUnit.SECONDS)
+    );
+    Runnable runnable = runnableCaptor.getValue();
+    Assert.assertNotNull(runnable);
+
+    Mockito.verify(runtimeInfo, Mockito.times(0)).shutdown(Mockito.eq(88));
+    runnable.run();
+    Mockito.verify(runtimeInfo, Mockito.times(1)).shutdown(Mockito.eq(88));
+  }
 }

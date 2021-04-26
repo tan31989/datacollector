@@ -490,7 +490,8 @@ run_sdc() {
     -mainClass ${SDC_MAIN_CLASS} -apiClasspath "${API_CLASSPATH}" -containerClasspath "${CONTAINER_CLASSPATH}" \
     -streamsetsLibrariesDir "${STREAMSETS_LIBRARIES_DIR}" -userLibrariesDir "${USER_LIBRARIES_DIR}" -configDir ${SDC_CONF} \
     -libsCommonLibDir "${LIBS_COMMON_LIB_DIR}" ${EXTRA_OPTIONS} 2>&1 | tee /tmp/engine-$$.out
-  RET=$?
+  # we need to capture the exist status of the first process in the pipeline
+  RET=${PIPESTATUS[0]}
   OUT=$(tail -50 /tmp/engine-$$.out)
 
   # Remove credential cache if exists
