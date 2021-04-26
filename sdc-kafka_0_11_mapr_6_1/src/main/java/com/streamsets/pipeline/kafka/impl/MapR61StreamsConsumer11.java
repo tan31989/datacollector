@@ -161,8 +161,6 @@ public class MapR61StreamsConsumer11 extends BaseKafkaConsumer11 {
     Set<String> forbiddenProperties = new HashSet<>(Arrays.asList(
         ConsumerConfig.GROUP_ID_CONFIG,
         ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG,
-        ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
         ConsumerConfig.AUTO_OFFSET_RESET_CONFIG
     ));
     forbiddenProperties.retainAll(kafkaConsumerConfigs.keySet());
