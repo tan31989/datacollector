@@ -47,6 +47,7 @@ import com.streamsets.pipeline.stage.origin.http.HttpResponseActionConfigBean;
 import com.streamsets.pipeline.stage.origin.http.PaginationMode;
 import com.streamsets.pipeline.stage.origin.http.ResponseAction;
 import com.streamsets.pipeline.stage.util.http.HttpStageUtil;
+import com.streamsets.pipeline.stage.util.http.TimeoutType;
 import org.apache.commons.lang.StringUtils;
 import org.glassfish.jersey.client.oauth1.OAuth1ClientSupport;
 import org.slf4j.Logger;
@@ -357,8 +358,13 @@ public class HttpProcessor extends SingleLaneProcessor {
         try {
           close = processResponse(record, future, conf.maxRequestCompletionSecs, false, recordsResponse, start);
 
-          completeRequest(record, future);
-
+          /* This invocation is useless and damaging once proper timeout handling has been implemented, and taking into account
+          that the future.get() invocation in this method has already been done in the processResponse() method, and that
+          this same method already takes care of timeout handling (including retries policy).
+          This comment and the method below will be removed in future reviews, and it is left here only for traceability
+          purposes.
+           */
+          // completeRequest(record, future);
           if (conf.pagination.mode != PaginationMode.NONE &&
               conf.multipleValuesBehavior != MultipleValuesBehavior.FIRST_ONLY &&
               !appliedRetryAction && !renewedToken) {
@@ -407,6 +413,7 @@ public class HttpProcessor extends SingleLaneProcessor {
     }
   }
 
+  @Deprecated
   private void completeRequest(Record record, Future<Response> future) {
     try {
       future.get(conf.maxRequestCompletionSecs, TimeUnit.SECONDS);
@@ -823,32 +830,31 @@ public class HttpProcessor extends SingleLaneProcessor {
       responseState.lastRequestTimedOut = false;
       responseState.lastStatus = responseStatus;
       return close;
-    } catch (InterruptedException | ExecutionException e) {
-      LOG.error(Errors.HTTP_03.getMessage(), getResponseStatus(), e.toString(), e);
-      throw new OnRecordErrorException(record, Errors.HTTP_03, getResponseStatus(), e.toString());
-    } catch (TimeoutException e) {
-      final HttpResponseActionConfigBean actionConf = this.timeoutActionConfig;
 
-      final boolean firstTimeout = !responseState.lastRequestTimedOut;
-
-      final AtomicInteger retryCountObj = new AtomicInteger(responseState.retryCount);
-      final AtomicLong backoffExp = new AtomicLong(responseState.backoffIntervalExponential);
-      final AtomicLong backoffLin = new AtomicLong(responseState.backoffIntervalLinear);
-      HttpStageUtil.applyResponseAction(actionConf,
-          firstTimeout,
-          input -> new StageException(Errors.HTTP_18),
-          retryCountObj,
-          backoffLin,
-          backoffExp,
-          record,
-          "action defined for timeout"
-      );
-      responseState.retryCount = retryCountObj.get();
-      responseState.backoffIntervalExponential = backoffExp.get();
-      responseState.backoffIntervalLinear = backoffLin.get();
-      responseState.lastRequestTimedOut = true;
-      return false;
-
+    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+        TimeoutType timeoutType = HttpStageUtil.findTimeoutType(e);
+        if (timeoutType == TimeoutType.NONE) {
+          LOG.error(Errors.HTTP_03.getMessage(), getResponseStatus(), e.toString(), e);
+          throw new OnRecordErrorException(record, Errors.HTTP_03, getResponseStatus(), e.toString());
+        }
+        final HttpResponseActionConfigBean actionConf = this.timeoutActionConfig;
+        final boolean firstTimeout = !responseState.lastRequestTimedOut;
+        final AtomicInteger retryCountObj = new AtomicInteger(responseState.retryCount);
+        final AtomicLong backoffExp = new AtomicLong(responseState.backoffIntervalExponential);
+        final AtomicLong backoffLin = new AtomicLong(responseState.backoffIntervalLinear);
+        HttpStageUtil.applyResponseAction(actionConf,
+            firstTimeout,
+            input -> new StageException(Errors.HTTP_18),
+            retryCountObj,
+            backoffLin,
+            backoffExp,
+            record,
+            "action defined for timeout" );
+        responseState.retryCount = retryCountObj.get();
+        responseState.backoffIntervalExponential = backoffExp.get();
+        responseState.backoffIntervalLinear = backoffLin.get();
+        responseState.lastRequestTimedOut = true;
+        return false;
     } finally {
       recordsToResponseState.put(record, responseState);
       if (recordResponse != null) {

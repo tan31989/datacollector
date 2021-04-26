@@ -29,6 +29,7 @@ import com.streamsets.pipeline.lib.http.Groups;
 import com.streamsets.pipeline.lib.http.oauth2.OAuth2ConfigBean;
 import com.streamsets.pipeline.lib.parser.DataParser;
 import com.streamsets.pipeline.lib.parser.DataParserFactory;
+import com.streamsets.pipeline.lib.util.ExceptionUtils;
 import com.streamsets.pipeline.lib.util.ThreadUtil;
 import com.streamsets.pipeline.stage.origin.http.HttpResponseActionConfigBean;
 import com.streamsets.pipeline.stage.origin.http.HttpStatusResponseActionConfigBean;
@@ -42,6 +43,7 @@ import javax.ws.rs.client.Client;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -306,5 +308,21 @@ public abstract class HttpStageUtil {
         break;
     }
     return uninterrupted;
+  }
+
+  public static TimeoutType findTimeoutType(Exception eException) {
+    Throwable throwable = ExceptionUtils.findSpecificCause(eException, SocketTimeoutException.class);
+    if (throwable == null) {
+      return TimeoutType.NONE;
+    }
+    if (throwable.getMessage().contains(TimeoutType.CONNECTION.getMessage())) {
+      return TimeoutType.CONNECTION;
+    } else if (throwable.getMessage().contains(TimeoutType.READ.getMessage())) {
+      return TimeoutType.READ;
+    } else if (throwable.getMessage().contains(TimeoutType.REQUEST.getMessage())) {
+      return TimeoutType.REQUEST;
+    } else {
+      return TimeoutType.UNKNOWN;
+    }
   }
 }
