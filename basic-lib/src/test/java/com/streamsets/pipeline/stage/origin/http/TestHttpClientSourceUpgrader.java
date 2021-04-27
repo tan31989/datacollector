@@ -37,8 +37,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URL;
 import java.util.ArrayList;
@@ -341,7 +339,8 @@ public class TestHttpClientSourceUpgrader {
             configValues.get("conf.responseTimeoutActionConfig.maxNumRetries"));
     assertEquals(HttpResponseActionConfigBean.DEFAULT_BACKOFF_INTERVAL_MS,
             configValues.get("conf.responseTimeoutActionConfig.backoffInterval"));
-    assertEquals(HttpTimeoutResponseActionConfigBean.DEFAULT_ACTION,
+    assertEquals(
+        HttpTimeoutOriginResponseActionConfigBean.DEFAULT_ACTION,
             configValues.get("conf.responseTimeoutActionConfig.action"));
     List<Map<String, Object>> statusActions =
             (List<Map<String, Object>>) configValues.get("conf.responseStatusActionConfigs");
@@ -350,8 +349,8 @@ public class TestHttpClientSourceUpgrader {
     Map<String, Object> defaultStatusAction = statusActions.get(0);
     assertEquals(HttpResponseActionConfigBean.DEFAULT_MAX_NUM_RETRIES, defaultStatusAction.get("maxNumRetries"));
     assertEquals(HttpResponseActionConfigBean.DEFAULT_BACKOFF_INTERVAL_MS, defaultStatusAction.get("backoffInterval"));
-    assertEquals(HttpStatusResponseActionConfigBean.DEFAULT_ACTION, defaultStatusAction.get("action"));
-    assertEquals(HttpStatusResponseActionConfigBean.DEFAULT_STATUS_CODE, defaultStatusAction.get("statusCode"));
+    assertEquals(HttpStatusOriginResponseActionConfigBean.DEFAULT_ACTION, defaultStatusAction.get("action"));
+    assertEquals(HttpStatusOriginResponseActionConfigBean.DEFAULT_STATUS_CODE, defaultStatusAction.get("statusCode"));
   }
 
   @Test

@@ -22,8 +22,7 @@ public enum ResponseAction implements Label {
   RETRY_EXPONENTIAL_BACKOFF("Retry with exponential backoff"),
   RETRY_IMMEDIATELY("Retry immediately"),
   STAGE_ERROR("Cause the stage to fail"),
-  ERROR_RECORD("Generate an Error Record"),
-  ;
+  ERROR_RECORD("Generate an Error Record");
 
   private final String label;
 

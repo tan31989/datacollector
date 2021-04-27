@@ -25,4 +25,5 @@ public abstract class HttpResponseActionConfigBean {
   public abstract long getBackoffInterval();
   public abstract int getMaxNumRetries();
   public abstract ResponseAction getAction();
+  public abstract boolean isPassRecord();
 }

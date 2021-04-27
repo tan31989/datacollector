@@ -35,8 +35,6 @@ import com.streamsets.pipeline.stage.common.MultipleValuesBehavior;
 import com.streamsets.pipeline.stage.common.MultipleValuesBehaviorChooserValues;
 import com.streamsets.pipeline.stage.origin.http.PaginationConfigBean;
 import com.streamsets.pipeline.stage.origin.lib.BasicConfig;
-import com.streamsets.pipeline.stage.origin.http.HttpStatusResponseActionConfigBean;
-import com.streamsets.pipeline.stage.origin.http.HttpTimeoutResponseActionConfigBean;
 import com.streamsets.pipeline.stage.origin.http.ResponseAction;
 import com.streamsets.pipeline.stage.origin.lib.DataParserFormatConfig;
 import com.streamsets.pipeline.stage.util.http.HttpStageUtil;
@@ -270,7 +268,7 @@ public class HttpProcessorConfig {
       group = "HTTP"
   )
   @ListBeanModel
-  public List<HttpStatusResponseActionConfigBean> responseStatusActionConfigs;
+  public List<HttpStatusProcessorResponseActionConfigBean> responseStatusActionConfigs;
 
   @ConfigDef(
       required = true,
@@ -297,8 +295,8 @@ public class HttpProcessorConfig {
   public String errorResponseField = "outErrorBody";
 
   @ConfigDefBean(groups = "TIMEOUT")
-  public HttpTimeoutResponseActionConfigBean responseTimeoutActionConfig =
-      new HttpTimeoutResponseActionConfigBean(0, ResponseAction.RETRY_IMMEDIATELY);
+  public HttpTimeoutProcessorResponseActionConfigBean responseTimeoutActionConfig =
+      new HttpTimeoutProcessorResponseActionConfigBean(0, ResponseAction.RETRY_IMMEDIATELY);
 
 
   public void init(Stage.Context context, String group, String prefix, List<Stage.ConfigIssue> issues) {

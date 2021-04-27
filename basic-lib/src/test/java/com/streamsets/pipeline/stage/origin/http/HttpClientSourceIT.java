@@ -964,14 +964,14 @@ public class HttpClientSourceIT extends JerseyTest {
       conf.dataFormat = DataFormat.JSON;
       conf.dataFormatConfig.jsonContent = JsonMode.MULTIPLE_OBJECTS;
 
-      final HttpStatusResponseActionConfigBean linearBackoff = new HttpStatusResponseActionConfigBean(
+      final HttpStatusOriginResponseActionConfigBean linearBackoff = new HttpStatusOriginResponseActionConfigBean(
           STATUS_SLOW_DOWN,
           MAX_NUM_REQUEST_RETRIES,
           BASELINE_BACKOFF_MS,
           ResponseAction.RETRY_LINEAR_BACKOFF
       );
 
-      final HttpStatusResponseActionConfigBean failAction = new HttpStatusResponseActionConfigBean(
+      final HttpStatusOriginResponseActionConfigBean failAction = new HttpStatusOriginResponseActionConfigBean(
           STATUS_TEST_FAIL,
           MAX_NUM_REQUEST_RETRIES,
           BASELINE_BACKOFF_MS,
@@ -1004,14 +1004,14 @@ public class HttpClientSourceIT extends JerseyTest {
       conf.dataFormat = DataFormat.JSON;
       conf.dataFormatConfig.jsonContent = JsonMode.MULTIPLE_OBJECTS;
 
-      final HttpStatusResponseActionConfigBean expBackoff = new HttpStatusResponseActionConfigBean(
+      final HttpStatusOriginResponseActionConfigBean expBackoff = new HttpStatusOriginResponseActionConfigBean(
           STATUS_SLOW_DOWN,
           MAX_NUM_REQUEST_RETRIES,
           BASELINE_BACKOFF_MS,
           ResponseAction.RETRY_EXPONENTIAL_BACKOFF
       );
 
-      final HttpStatusResponseActionConfigBean failAction = new HttpStatusResponseActionConfigBean(
+      final HttpStatusOriginResponseActionConfigBean failAction = new HttpStatusOriginResponseActionConfigBean(
           STATUS_TEST_FAIL,
           MAX_NUM_REQUEST_RETRIES,
           BASELINE_BACKOFF_MS,
@@ -1044,14 +1044,14 @@ public class HttpClientSourceIT extends JerseyTest {
     conf.dataFormat = DataFormat.JSON;
     conf.dataFormatConfig.jsonContent = JsonMode.MULTIPLE_OBJECTS;
 
-    final HttpStatusResponseActionConfigBean expBackoff = new HttpStatusResponseActionConfigBean(
+    final HttpStatusOriginResponseActionConfigBean expBackoff = new HttpStatusOriginResponseActionConfigBean(
         STATUS_SLOW_DOWN,
         MAX_NUM_REQUEST_RETRIES,
         BASELINE_BACKOFF_MS,
         ResponseAction.RETRY_EXPONENTIAL_BACKOFF
     );
 
-    final HttpStatusResponseActionConfigBean failAction = new HttpStatusResponseActionConfigBean(
+    final HttpStatusOriginResponseActionConfigBean failAction = new HttpStatusOriginResponseActionConfigBean(
         STATUS_TEST_FAIL,
         MAX_NUM_REQUEST_RETRIES,
         BASELINE_BACKOFF_MS,
@@ -1062,7 +1062,7 @@ public class HttpClientSourceIT extends JerseyTest {
     conf.responseStatusActionConfigs.add(expBackoff);
     conf.responseStatusActionConfigs.add(failAction);
 
-    conf.responseTimeoutActionConfig = new HttpTimeoutResponseActionConfigBean(0, ResponseAction.RETRY_IMMEDIATELY);
+    conf.responseTimeoutActionConfig = new HttpTimeoutOriginResponseActionConfigBean(0, ResponseAction.RETRY_IMMEDIATELY);
 
     /*
           1. newline (empty batch)

@@ -181,16 +181,16 @@ public class HttpClientConfigBean {
   public DataFormat dataFormat = DataFormat.JSON;
 
   @ConfigDef(
-          required = false,
-          type = ConfigDef.Type.MODEL,
-          label = "Per-Status Actions",
-          description = "List of actions to take for specific response statuses.",
-          displayPosition = 27,
+      required = false,
+      type = ConfigDef.Type.MODEL,
+      label = "Per-Status Actions",
+      description = "List of actions to take for specific response statuses.",
+      displayPosition = 27,
       displayMode = ConfigDef.DisplayMode.ADVANCED,
-          group = "HTTP"
+      group = "HTTP"
   )
   @ListBeanModel
-  public List<HttpStatusResponseActionConfigBean> responseStatusActionConfigs;
+  public List<HttpStatusOriginResponseActionConfigBean> responseStatusActionConfigs;
 
   @ConfigDef(
       required = true,
@@ -219,8 +219,8 @@ public class HttpClientConfigBean {
   public String errorResponseField = "outErrorBody";
 
   @ConfigDefBean(groups = "TIMEOUT")
-  public HttpTimeoutResponseActionConfigBean responseTimeoutActionConfig =
-          new HttpTimeoutResponseActionConfigBean(0, ResponseAction.RETRY_IMMEDIATELY);
+  public HttpTimeoutOriginResponseActionConfigBean responseTimeoutActionConfig =
+          new HttpTimeoutOriginResponseActionConfigBean(0, ResponseAction.RETRY_IMMEDIATELY);
 
   @ConfigDefBean(groups = "PAGINATION")
   public PaginationConfigBean pagination = new PaginationConfigBean();

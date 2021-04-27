@@ -149,16 +149,16 @@ public class HttpClientSourceUpgrader implements StageUpgrader {
   private static void upgradeV9ToV10(List<Config> configs) {
     ArrayList<Map<String, Object>> statusActions = new ArrayList<>();
     final Map<String, Object> defaultStatusAction = new HashMap<>();
-    defaultStatusAction.put("statusCode", HttpStatusResponseActionConfigBean.DEFAULT_STATUS_CODE);
-    defaultStatusAction.put("action", HttpStatusResponseActionConfigBean.DEFAULT_ACTION);
+    defaultStatusAction.put("statusCode", HttpStatusOriginResponseActionConfigBean.DEFAULT_STATUS_CODE);
+    defaultStatusAction.put("action", HttpStatusOriginResponseActionConfigBean.DEFAULT_ACTION);
     defaultStatusAction.put("backoffInterval",
-            HttpStatusResponseActionConfigBean.DEFAULT_BACKOFF_INTERVAL_MS);
+            HttpStatusOriginResponseActionConfigBean.DEFAULT_BACKOFF_INTERVAL_MS);
     defaultStatusAction.put("maxNumRetries",
-            HttpStatusResponseActionConfigBean.DEFAULT_MAX_NUM_RETRIES);
+            HttpStatusOriginResponseActionConfigBean.DEFAULT_MAX_NUM_RETRIES);
     statusActions.add(defaultStatusAction);
     configs.add(new Config("conf.responseStatusActionConfigs", statusActions));
     configs.add(new Config(joiner.join(CONF, "responseTimeoutActionConfig", "action"),
-            HttpTimeoutResponseActionConfigBean.DEFAULT_ACTION));
+            HttpTimeoutOriginResponseActionConfigBean.DEFAULT_ACTION));
     configs.add(new Config(joiner.join(CONF, "responseTimeoutActionConfig", "backoffInterval"),
             HttpResponseActionConfigBean.DEFAULT_BACKOFF_INTERVAL_MS));
     configs.add(new Config(joiner.join(CONF, "responseTimeoutActionConfig", "maxNumRetries"),

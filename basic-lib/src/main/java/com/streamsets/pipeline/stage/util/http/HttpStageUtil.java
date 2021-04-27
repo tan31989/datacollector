@@ -32,7 +32,6 @@ import com.streamsets.pipeline.lib.parser.DataParserFactory;
 import com.streamsets.pipeline.lib.util.ExceptionUtils;
 import com.streamsets.pipeline.lib.util.ThreadUtil;
 import com.streamsets.pipeline.stage.origin.http.HttpResponseActionConfigBean;
-import com.streamsets.pipeline.stage.origin.http.HttpStatusResponseActionConfigBean;
 import com.streamsets.pipeline.stage.origin.http.ResponseAction;
 import com.streamsets.pipeline.stage.origin.restservice.RestServiceReceiver;
 import org.apache.commons.lang.StringUtils;
@@ -177,7 +176,7 @@ public abstract class HttpStageUtil {
   public static List<Stage.ConfigIssue> validateStatusActionConfigs(
       List<Stage.ConfigIssue> issues,
       Stage.Context context,
-      List<HttpStatusResponseActionConfigBean> responseStatusActionConfigs,
+      List<? extends HttpResponseActionConfigBean> responseStatusActionConfigs,
       Map<Integer, HttpResponseActionConfigBean> statusToActionConfigs,
       String configName
     ) {

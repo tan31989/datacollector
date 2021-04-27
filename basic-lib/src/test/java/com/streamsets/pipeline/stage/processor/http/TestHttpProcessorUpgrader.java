@@ -16,6 +16,7 @@
 package com.streamsets.pipeline.stage.processor.http;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.streamsets.pipeline.api.Config;
 import com.streamsets.pipeline.api.StageUpgrader;
 import com.streamsets.pipeline.config.upgrade.UpgraderTestUtils;
@@ -32,6 +33,7 @@ import com.streamsets.pipeline.stage.common.MultipleValuesBehavior;
 import com.streamsets.pipeline.stage.origin.http.HttpClientSourceUpgrader;
 import com.streamsets.pipeline.stage.util.tls.TlsConfigBeanUpgraderTestUtil;
 import com.streamsets.pipeline.upgrader.SelectorStageUpgrader;
+import org.apache.commons.collections4.CollectionUtils;
 import org.glassfish.jersey.client.RequestEntityProcessing;
 import org.junit.Assert;
 import org.junit.Before;
@@ -390,5 +392,39 @@ public class TestHttpProcessorUpgrader {
     configs = upgrader.upgrade(configs, context);
 
     UpgraderTestUtils.assertExists(configs,"conf.missingValuesBehavior", "PASS_RECORD_ON");
+  }
+
+  @Test
+  public void testV17ToV18() {
+    Mockito.doReturn(17).when(context).getFromVersion();
+    Mockito.doReturn(18).when(context).getToVersion();
+
+    configs.add(new Config("conf.responseStatusActionConfigs",
+        ImmutableList.of(ImmutableMap.of(
+            "statusCode", "500",
+            "maxNumRetries", "5",
+            "backoffInterval", "1000",
+            "action", "RETRY_IMMEDIATELY"))));
+
+    configs = upgrader.upgrade(configs, context);
+
+    UpgraderTestUtils.assertExists(configs,"conf.responseTimeoutActionConfig.passRecord", false);
+    UpgraderTestUtils.assertExists(configs,"conf.responseStatusActionConfigs");
+
+    Map responseTimeoutActionConfig =  (Map) ((List) find(configs, "conf.responseStatusActionConfigs").getValue()).get(0);
+    Assert.assertTrue(responseTimeoutActionConfig.get("statusCode") == "500");
+    Assert.assertTrue(responseTimeoutActionConfig.get("maxNumRetries") == "5");
+    Assert.assertTrue(responseTimeoutActionConfig.get("backoffInterval") == "1000");
+    Assert.assertTrue(responseTimeoutActionConfig.get("action") == "RETRY_IMMEDIATELY");
+    Assert.assertTrue(responseTimeoutActionConfig.get("passRecord") == Boolean.FALSE);
+  }
+
+  private Config find(List<Config> configs, String name) {
+    for (Config config : configs) {
+      if (config.getName().equals(name)) {
+        return config;
+      }
+    }
+    return null;
   }
 }
