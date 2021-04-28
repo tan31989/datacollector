@@ -451,25 +451,25 @@ run_bootstrap() {
   STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR=${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR:=${SDC_DIST}}
 
   if [[ ! -z "${STREAMSETS_DEPLOYMENT_SCH_URL}" ]] && [[ ! -z "${STREAMSETS_DEPLOYMENT_ID}" ]] && [[ ! -z "${STREAMSETS_DEPLOYMENT_TOKEN}" ]]; then
-    if [[ ! -d ${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/deployment-lib ]]; then
-      check_curl_and_tar_installed
+    # Perform Download Operation
+    downloadWithChecksumVerification "BOOTSTRAP" "${STREAMSETS_DEPLOYMENT_SCH_URL}/engineBootstrap/bootstrap.tgz" "${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/bootstrap.tgz"
 
-      run curl -o ${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/bootstrap.tgz -L ${STREAMSETS_DEPLOYMENT_SCH_URL}/engineBootstrap/bootstrap.tgz
-      if [[ ${RET} -ne 0 ]]; then
-        MESSAGE="Downloading Bootstrap tarball '${STREAMSETS_DEPLOYMENT_SCH_URL}/engineBootstrap/bootstrap.tgz', ${ERR}"
-        reportEvent "ERROR" "STARTUP" "S06" "${MESSAGE}"
-        exit 1
-      fi
-
-      run tar xzf ${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/bootstrap.tgz --directory ${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}
-      if [[ ${RET} -ne 0 ]]; then
-        MESSAGE="Extracting tarball binary '${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/bootstrap.tgz', ${ERR}"
-        reportEvent "ERROR" "STARTUP" "S07" "${MESSAGE}"
-        exit 1
-      fi
+    # Delete old deployment lib
+    run rm -rf ${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/deployment-lib
+    if [[ ${RET} -ne 0 ]]; then
+      MESSAGE="Could not delete '${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/deployment-lib' directory, ${ERR}"
+      reportEvent "ERROR" "BOOTSTRAP" "B01" "${MESSAGE}"
+      exit 1
     fi
 
-    reportEvent "INFO" "BOOTSTRAP" "B01" "Starting Bootstrap"
+    run tar xzf ${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/bootstrap.tgz --directory ${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}
+    if [[ ${RET} -ne 0 ]]; then
+      MESSAGE="Extracting tarball binary '${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/bootstrap.tgz', ${ERR}"
+      reportEvent "ERROR" "BOOTSTRAP" "B02" "${MESSAGE}"
+      exit 1
+    fi
+
+    reportEvent "INFO" "BOOTSTRAP" "B03" "Starting Bootstrap"
 
     STREAMSETS_BOOTSTRAP_MAIN_CLASS="com.streamsets.engine.deployment.bootstrap.DeploymentBootstrapMain"
     STREAMSETS_BOOTSTRAP_JAVA_OPTS="-Dstreamsets.deployment.conf.dir=${SDC_CONF} -Dstreamsets.deployment.data.dir=${SDC_DATA} -Dstreamsets.deployment.stage.lib.dir=${STREAMSETS_LIBRARIES_DIR} ${STREAMSETS_BOOTSTRAP_JAVA_OPTS}"
@@ -477,7 +477,7 @@ run_bootstrap() {
 
     if [[ ${RET} -ne 0 ]]; then
       MESSAGE="Bootstrap error, ${ERR}"
-      reportEvent "ERROR" "BOOTSTRAP" "B02" "${MESSAGE}"
+      reportEvent "ERROR" "BOOTSTRAP" "B04" "${MESSAGE}"
       exit 1
     fi
 
