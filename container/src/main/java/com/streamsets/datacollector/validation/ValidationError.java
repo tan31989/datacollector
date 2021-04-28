@@ -105,7 +105,7 @@ public enum ValidationError implements ErrorCode {
   VALIDATION_0091("Found more than one Target stage that triggers offset commit"),
   VALIDATION_0092("Delivery Guarantee can only be {} if pipeline contains a destination that triggers offset commit"),
   VALIDATION_0093("The pipeline title is empty"),
-  VALIDATION_0094("Stage expects {} input lanes, but only {} given"),
+  VALIDATION_0094("Stage expects {} input lanes but {} were found"),
   VALIDATION_0095("Stage library {} is a legacy library and must be installed separately"),
   VALIDATION_0096("This pipeline was created in version {} and is not compatible with current version {}"),
 
