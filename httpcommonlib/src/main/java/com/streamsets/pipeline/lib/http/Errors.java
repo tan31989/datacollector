@@ -80,11 +80,11 @@ public enum Errors implements ErrorCode {
   HTTP_67("HTTP-Status: {}. Not able to finish all retries because the batch was timed out. Please " +
       "increase the 'Batch Wait Time' or decrease the 'Base Backoff Interval'"),
   HTTP_68("No results for request: '{}'"),
-  // HTTP Processor
-
   HTTP_100("Generating error record as per stage configuration: {}"),
 
-  ;
+  // Passthrough
+  HTTP_101("Applying passtrough and error policy on status configuration"),
+  HTTP_102("Applying passtrough and error policy on timeout configuration");
 
   private final String msg;
 

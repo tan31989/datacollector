@@ -47,8 +47,9 @@ import com.streamsets.pipeline.stage.origin.http.HttpResponseActionConfigBean;
 import com.streamsets.pipeline.stage.origin.http.PaginationMode;
 import com.streamsets.pipeline.stage.origin.http.ResponseAction;
 import com.streamsets.pipeline.stage.util.http.HttpStageUtil;
+import com.streamsets.pipeline.stage.util.http.PassthroughAttributes;
 import com.streamsets.pipeline.stage.util.http.TimeoutType;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.glassfish.jersey.client.oauth1.OAuth1ClientSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +80,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.streamsets.pipeline.lib.http.Errors.HTTP_66;
@@ -96,9 +98,9 @@ public class HttpProcessor extends SingleLaneProcessor {
   private static final String STOP_CONFIG_NAME = "stopCondition";
   private static final String START_AT = "startAt";
 
-  private static final Set<PaginationMode> LINK_PAGINATION = ImmutableSet.of(PaginationMode.LINK_HEADER,
-      PaginationMode.LINK_FIELD
-  );
+  private static final Set<PaginationMode> LINK_PAGINATION = ImmutableSet.of(
+      PaginationMode.LINK_HEADER,
+      PaginationMode.LINK_FIELD);
 
   private Link next;
   private String resolvedUrl;
@@ -109,8 +111,11 @@ public class HttpProcessor extends SingleLaneProcessor {
   private RateLimiter rateLimiter;
   private Response response;
   private boolean lastRequestTimedOut = false;
+  private boolean batchWaitTimeExpired = false;
   private boolean haveMorePages;
   private boolean appliedRetryAction;
+  private boolean appliedErrorAction;
+  private boolean appliedPassthroughAction;
   private boolean renewedToken;
 
   private ELVars resourceVars;
@@ -123,11 +128,26 @@ public class HttpProcessor extends SingleLaneProcessor {
   private final Map<Record, HeadersAndBody> resolvedRecords = new LinkedHashMap<>();
 
   private static class ResponseState {
+    public static final Integer TIMEOUT_KEY = -1;
+
     private long backoffIntervalLinear = 0;
     private long backoffIntervalExponential = 0;
-    private int retryCount = 0;
+    // Retries count at status level. Key 0 (TIMEOUT_KEY) indicates timeout of any kind.
+    private Map<Integer, Integer> retryCountForStatus = new HashMap<>();
     private int lastStatus = 0;
     private boolean lastRequestTimedOut;
+
+    @Override
+    public String toString() {
+      return "ResponseState "
+          + "{"
+          + "backoffIntervalLinear=" + backoffIntervalLinear + " - "
+          + "backoffIntervalExponential=" + backoffIntervalExponential + " - "
+          + "retryCount=" + StringUtils.join(retryCountForStatus, " - ") + " - "
+          + "lastStatus=" + lastStatus  + " - "
+          + "lastRequestTimedOut=" + lastRequestTimedOut
+          + "}";
+    }
   }
 
   private final Map<Record, ResponseState> recordsToResponseState = new HashMap<>();
@@ -156,7 +176,8 @@ public class HttpProcessor extends SingleLaneProcessor {
 
     httpClientCommon.init(issues, getContext());
 
-    conf.dataFormatConfig.init(getContext(),
+    conf.dataFormatConfig.init(
+        getContext(),
         conf.dataFormat,
         Groups.HTTP.name(),
         HttpClientCommon.DATA_FORMAT_CONFIG_PREFIX,
@@ -175,7 +196,8 @@ public class HttpProcessor extends SingleLaneProcessor {
     next = null;
     haveMorePages = false;
 
-    HttpStageUtil.validateStatusActionConfigs(issues,
+    HttpStageUtil.validateStatusActionConfigs(
+        issues,
         getContext(),
         conf.responseStatusActionConfigs,
         statusToActionConfigs,
@@ -200,127 +222,6 @@ public class HttpProcessor extends SingleLaneProcessor {
     super.destroy();
   }
 
-  /**
-   * Returns true if the batchWaitTime has expired and we should return from produce
-   *
-   * @param start the time in milliseconds at which this produce call began
-   * @return whether or not to return the batch as-is
-   */
-  private boolean waitTimeExpired(long start) {
-    return (System.currentTimeMillis() - start) > conf.basic.maxWaitTime;
-  }
-
-
-  /**
-   * Sets the startAt EL variable in scope for the resource and request body.
-   * If the source offset is null (origin was reset) then the initial value
-   * from the user provided configuration is used.
-   */
-  private void initPageOffset() {
-    switch (conf.pagination.mode) {
-      case LINK_HEADER:
-      case LINK_FIELD:
-      case BY_OFFSET:
-      case BY_PAGE:
-        int startAt = conf.pagination.startAt;
-        resourceVars.addVariable(START_AT, startAt);
-        bodyVars.addVariable(START_AT, startAt);
-        break;
-      default:
-    }
-  }
-
-  @VisibleForTesting
-  String resolveInitialUrl(Record record) {
-    RecordEL.setRecordInContext(resourceVars, record);
-    TimeEL.setCalendarInContext(resourceVars, Calendar.getInstance());
-    TimeNowEL.setTimeNowInContext(resourceVars, new Date());
-    return resourceEval.eval(resourceVars, conf.resourceUrl, String.class);
-  }
-
-  /**
-   * Helper method to construct an HTTP request and fetch a response.
-   *
-   * @param target the target url to fetch.
-   */
-  private Future<Response> makeRequest(WebTarget target, Record record) {
-    MultivaluedMap<String, Object> resolvedHeaders = httpClientCommon.resolveHeaders(conf.headers, record);
-    String contentType = HttpStageUtil.getContentTypeWithDefault(resolvedHeaders, conf.defaultRequestContentType);
-    final AsyncInvoker asyncInvoker = target.request()
-                                            .property(OAuth1ClientSupport.OAUTH_PROPERTY_ACCESS_TOKEN,
-                                                httpClientCommon.getAuthToken()
-                                            )
-                                            .headers(resolvedHeaders)
-                                            .async();
-
-    HttpMethod method = httpClientCommon.getHttpMethod(conf.httpMethod, conf.methodExpression, record);
-    Future<Response> futureResp = null;
-
-    long startTime = System.currentTimeMillis();
-
-
-    try {
-      rateLimiter.acquire();
-      if (conf.requestBody != null && !conf.requestBody.isEmpty() && method != HttpMethod.GET) {
-        RecordEL.setRecordInContext(bodyVars, record);
-        final String requestBody = bodyEval.eval(bodyVars, conf.requestBody, String.class);
-        resolvedRecords.put(record, new HeadersAndBody(resolvedHeaders, requestBody, contentType, method, target));
-        futureResp = asyncInvoker.method(method.getLabel(), Entity.entity(requestBody, contentType));
-
-      } else {
-        resolvedRecords.put(record, new HeadersAndBody(resolvedHeaders, null, null, method, target));
-        futureResp = asyncInvoker.method(method.getLabel());
-      }
-      LOG.debug("Retrieved response in {} ms", System.currentTimeMillis() - startTime);
-      lastRequestTimedOut = false;
-    } catch (Exception e) {
-      LOG.debug("Request failed after {} ms", System.currentTimeMillis() - startTime);
-      final Throwable cause = e.getCause();
-      if (cause != null && (cause instanceof TimeoutException || cause instanceof SocketTimeoutException)) {
-        LOG.warn("{} attempting to read response in HttpClientSource: {}",
-            cause.getClass().getSimpleName(),
-            e.getMessage(),
-            e
-        );
-
-        lastRequestTimedOut = true;
-
-      } else if (cause instanceof InterruptedException) {
-        LOG.error(String.format("InterruptedException attempting to make request in HttpClientSource; stopping: %s",
-            e.getMessage()
-            ),
-            e
-        );
-
-      } else {
-        LOG.error(String.format("ProcessingException attempting to make request in HttpClientSource: %s",
-            e.getMessage()
-        ), e);
-        Throwable reportEx = cause != null ? cause : e;
-        final StageException stageException = new StageException(Errors.HTTP_32,
-            getResponseStatus(),
-            reportEx.toString(),
-            reportEx
-        );
-        LOG.error(stageException.getMessage());
-        throw stageException;
-      }
-    }
-    return futureResp;
-  }
-
-
-  @VisibleForTesting
-  int getCurrentPage() {
-    // Body params take precedence, but usually only one or the other should be used.
-    if (bodyVars.hasVariable(START_AT)) {
-      return (int) bodyVars.getVariable(START_AT);
-    } else if (resourceVars.hasVariable(START_AT)) {
-      return (int) resourceVars.getVariable(START_AT);
-    }
-    return 0;
-  }
-
   @Override
   public void process(Batch batch, SingleLaneBatchMaker batchMaker) {
     resolvedRecords.clear();
@@ -329,14 +230,15 @@ public class HttpProcessor extends SingleLaneProcessor {
     boolean close = false;
     while (records.hasNext()) {
 
-      boolean uninterrupted = true;
       Record record = records.next();
+
+      boolean uninterrupted = true;
+
       int countPages = conf.pagination.startAt;
       initPageOffset();
 
       String initialResolvedURL = resolveInitialUrl(record);
       WebTarget target = httpClientCommon.getClient().target(initialResolvedURL);
-
       LOG.debug("Resolved HTTP Client URL: '{}'", initialResolvedURL);
 
       // If the request (headers or body) contain a known sensitive EL and we're not using https then fail the request.
@@ -347,27 +249,20 @@ public class HttpProcessor extends SingleLaneProcessor {
 
       List<Record> addToBatchRecords;
       List<Record> recordsResponse;
-
+      List<Record> recordsPassthrough;
       Record currentRecord = null;
-
       do {
         recordsResponse = new ArrayList<>();
-        Future<Response> future = makeRequest(target, record);
+        recordsPassthrough = new ArrayList<>();
         int numRecordsLastRequest;
-
         try {
-          close = processResponse(record, future, conf.maxRequestCompletionSecs, false, recordsResponse, start);
-
-          /* This invocation is useless and damaging once proper timeout handling has been implemented, and taking into account
-          that the future.get() invocation in this method has already been done in the processResponse() method, and that
-          this same method already takes care of timeout handling (including retries policy).
-          This comment and the method below will be removed in future reviews, and it is left here only for traceability
-          purposes.
-           */
-          // completeRequest(record, future);
+          close = processResponse(record, target, conf.maxRequestCompletionSecs, false, recordsResponse, recordsPassthrough, start);
           if (conf.pagination.mode != PaginationMode.NONE &&
               conf.multipleValuesBehavior != MultipleValuesBehavior.FIRST_ONLY &&
-              !appliedRetryAction && !renewedToken) {
+              !appliedRetryAction &&
+              !appliedErrorAction &&
+              !appliedPassthroughAction &&
+              !renewedToken) {
             Record recordResp = recordsResponse.get(0);
             String resultFieldPath = conf.pagination.keepAllFields ? conf.pagination.resultFieldPath : "";
             List listResponse = (List) recordResp.get(resultFieldPath).getValue();
@@ -400,91 +295,62 @@ public class HttpProcessor extends SingleLaneProcessor {
         }
       } while (shouldMakeAnotherRequest(start, uninterrupted, close, recordsToResponseState.get(record)));
 
-      if (recordsResponse != null && response != null) {
-        addToBatchRecords = processRecord(currentRecord, record, response);
-        for (Record recToAdd : addToBatchRecords) {
+      if (!appliedPassthroughAction) {
+        if (recordsResponse != null && response != null) {
+          addToBatchRecords = processRecord(currentRecord, record, response);
+          for (Record recToAdd : addToBatchRecords) {
+            batchMaker.addRecord(recToAdd);
+          }
+        }
+      } else {
+        for (Record recToAdd : recordsPassthrough) {
           batchMaker.addRecord(recToAdd);
         }
       }
     }
 
-    if (!resolvedRecords.isEmpty() && !close) {
-      reprocessIfRequired(batchMaker);
+    if (!resolvedRecords.isEmpty()) {
+      for (Map.Entry<Record, HeadersAndBody> entry : resolvedRecords.entrySet()) {
+        LOG.debug(String.format(
+            "Removing expired resolved record: %s a %s b %s c %s, %s",
+            entry.getKey(),
+            entry.getValue().requestBody,
+            entry.getValue().contentType,
+            entry.getValue().target,
+            entry.getValue().method));
+      }
     }
-  }
-
-  @Deprecated
-  private void completeRequest(Record record, Future<Response> future) {
-    try {
-      future.get(conf.maxRequestCompletionSecs, TimeUnit.SECONDS);
-    } catch (InterruptedException | ExecutionException e) {
-      LOG.error(Errors.HTTP_03.getMessage(), e.toString(), e);
-      throw new OnRecordErrorException(record, Errors.HTTP_03, e.toString());
-    } catch (TimeoutException e) {
-      LOG.error("HTTP request future timed out", e.toString(), e);
-      throw new OnRecordErrorException(record, Errors.HTTP_03, e.toString());
-    }
-  }
-
-  private boolean shouldMakeAnotherRequest(
-      long start, boolean uninterrupted, boolean close, ResponseState responseState
-  ) {
-    boolean waitTimeNotExp = !waitTimeExpired(start);
-    boolean thereIsNextLink = (
-        ((conf.pagination.mode == PaginationMode.LINK_FIELD) || (conf.pagination.mode == PaginationMode.LINK_HEADER)) &&
-            haveMorePages
-    );
-    boolean isLink = conf.pagination.mode == PaginationMode.BY_PAGE ||
-            conf.pagination.mode == PaginationMode.BY_OFFSET;
-
-    HttpResponseActionConfigBean action = statusToActionConfigs.get(responseState.lastStatus);
-    boolean numRetriesExceed = action != null && responseState.retryCount > action.getMaxNumRetries();
-
-    boolean canPaginate = (conf.pagination.mode != PaginationMode.NONE &&
-        conf.multipleValuesBehavior != MultipleValuesBehavior.FIRST_ONLY &&
-        (thereIsNextLink || isLink));
-    boolean canContinue = canPaginate || (action != null);
-
-    return (waitTimeNotExp &&
-        uninterrupted &&
-        !lastRequestTimedOut &&
-        !close &&
-        canContinue &&
-        !numRetriesExceed) ||
-        renewedToken;
+    resolvedRecords.clear();
+    recordsToResponseState.clear();
   }
 
   /**
    * Sets the startAt EL variable in scope for the resource and request body.
    * If the source offset is null (origin was reset) then the initial value
    * from the user provided configuration is used.
-   *
-   * @param sourceOffset source offset to parse for startAt variable.
    */
-  private void setPageOffset(String sourceOffset) {
-    if (conf.pagination.mode == PaginationMode.NONE) {
-      return;
+  private void initPageOffset() {
+    switch (conf.pagination.mode) {
+      case LINK_HEADER:
+      case LINK_FIELD:
+      case BY_OFFSET:
+      case BY_PAGE:
+        int startAt = conf.pagination.startAt;
+        resourceVars.addVariable(START_AT, startAt);
+        bodyVars.addVariable(START_AT, startAt);
+        break;
+      default:
+        break;
     }
-
-    int startAt = conf.pagination.startAt;
-    if (StringUtils.isNotEmpty(sourceOffset) && StringUtils.isNumeric(sourceOffset)) {
-      startAt = Integer.parseInt(sourceOffset);
-    }
-
-    resourceVars.addVariable(START_AT, startAt);
-    bodyVars.addVariable(START_AT, startAt);
   }
 
   @VisibleForTesting
-  String getResolvedUrl() {
-    return resolvedUrl;
+  String resolveInitialUrl(Record record) {
+    RecordEL.setRecordInContext(resourceVars, record);
+    TimeEL.setCalendarInContext(resourceVars, Calendar.getInstance());
+    TimeNowEL.setTimeNowInContext(resourceVars, new Date());
+    return resourceEval.eval(resourceVars, conf.resourceUrl, String.class);
   }
-
-  @VisibleForTesting
-  void setResolvedUrl(String resolvedUrl) {
-    this.resolvedUrl = resolvedUrl;
-  }
-
 
   /**
    * Returns the URL of the next page to fetch when paging is enabled. Otherwise
@@ -510,212 +376,126 @@ public class HttpProcessor extends SingleLaneProcessor {
     return url;
   }
 
-
-  private List<Record> processRecord(Record currentRecord, Record inRec, Response response) {
-    List<Record> recordsProcessed = new ArrayList<>();
-
-    if (currentRecord == null) {
-      return recordsProcessed;
+  /**
+   * Sets the startAt EL variable in scope for the resource and request body.
+   * If the source offset is null (origin was reset) then the initial value
+   * from the user provided configuration is used.
+   *
+   * @param sourceOffset source offset to parse for startAt variable.
+   */
+  private void setPageOffset(String sourceOffset) {
+    if (conf.pagination.mode == PaginationMode.NONE) {
+      return;
     }
 
-    Record firstRecord = currentRecord;
-    Field field = inRec.get();
+    int startAt = conf.pagination.startAt;
+    if (StringUtils.isNotEmpty(sourceOffset) && StringUtils.isNumeric(sourceOffset)) {
+      startAt = Integer.parseInt(sourceOffset);
+    }
 
-    if (field != null) {
-      try {
-        final String parserId = String.format("%s_%s_%s",
-            getContext().getStageInfo().getInstanceName(),
-            firstRecord.getHeader().getSourceId(),
-            conf.outputField
-        );
+    resourceVars.addVariable(START_AT, startAt);
+    bodyVars.addVariable(START_AT, startAt);
+  }
 
-        // Check the type is correct and if it's a File Ref then it is parsed using the input stream.
-        switch (field.getType()) {
-          case LIST_MAP:
-          case LIST:
-          case MAP:
-          case STRING:
-          case BYTE_ARRAY:
-            // Do nothing...
-            break;
-          case FILE_REF:
-            currentRecord = parseFileRefRecord(inRec, response, field, parserId);
-            break;
-          default:
-            throw new OnRecordErrorException(inRec,
-                Errors.HTTP_61,
-                getResponseStatus(response),
-                conf.outputField,
-                field.getType().name()
-            );
-        }
+  @VisibleForTesting
+  int getCurrentPage() {
+    // Body params take precedence, but usually only one or the other should be used.
+    if (bodyVars.hasVariable(START_AT)) {
+      return (int) bodyVars.getVariable(START_AT);
+    } else if (resourceVars.hasVariable(START_AT)) {
+      return (int) resourceVars.getVariable(START_AT);
+    }
+    return 0;
+  }
 
-        Object currentRecordValue = currentRecord.get().getValue();
-        List<Field> currentRecordList;
-        if (currentRecordValue instanceof List) {
-          currentRecordList = (List<Field>) currentRecordValue;
-        } else {
-          currentRecordList = Collections.singletonList(currentRecord.get());
-        }
+  @VisibleForTesting
+  void setResolvedUrl(String resolvedUrl) {
+    this.resolvedUrl = resolvedUrl;
+  }
 
-        if (currentRecordList.isEmpty()) {
-          // No results
-          switch (conf.missingValuesBehavior) {
-            case SEND_TO_ERROR:
-              LOG.error(Errors.HTTP_68.getMessage(), getResponseStatus(response));
-              Record cloneRecord = getContext().cloneRecord(inRec);
-              errorRecordHandler.onError(new OnRecordErrorException(cloneRecord,
-                  Errors.HTTP_68,
-                  getResponseStatus(response)
-              ));
-              break;
-            case PASS_RECORD_ON:
-              Record recToAddToBatch = getContext().cloneRecord(inRec);
-              recordsProcessed.add(recToAddToBatch);
-              break;
-            default:
-              throw new IllegalStateException("Unknown missing value behavior: " + conf.missingValuesBehavior);
-          }
-        } else {
-          switch (conf.multipleValuesBehavior) {
-            case FIRST_ONLY:
-              Map<String, Field> fieldsMap = new HashMap<>((Map<String, Field>) inRec.get().getValue());
-              Field resFieldHeaders = createResponseHeaders(inRec, response);
-              if (resFieldHeaders != null) {
-                fieldsMap.put(conf.headerOutputField.replace("/", ""), resFieldHeaders);
-              }
-              fieldsMap.put(conf.outputField.replace("/", ""), currentRecordList.get(0));
-              Record recToAddToBatch = getContext().cloneRecord(inRec);
-              recToAddToBatch.set(Field.create(fieldsMap));
-              recordsProcessed.add(recToAddToBatch);
-              break;
-            case ALL_AS_LIST:
-              Map<String, Field> fs = new HashMap<>((Map<String, Field>) inRec.get().getValue());
-              Field resField = createResponseHeaders(inRec, response);
-              if (resField != null) {
-                fs.put(conf.headerOutputField.replace("/", ""), resField);
-              }
-              fs.put(conf.outputField.replace("/", ""), Field.create(currentRecordList));
-              Record recToAddToBatchList = getContext().cloneRecord(inRec);
-              recToAddToBatchList.set(Field.create(fs));
-              recordsProcessed.add(recToAddToBatchList);
-              break;
-            case SPLIT_INTO_MULTIPLE_RECORDS:
-              for (Field value : currentRecordList) {
-                Record parsedRecord = getContext().createRecord("");
-                parsedRecord.set(value);
-                Map<String, Field> fields = new HashMap<>((Map<String, Field>) inRec.get().getValue());
-                Field responseField = createResponseHeaders(inRec, response);
-                if (responseField != null) {
-                  fields.put(conf.headerOutputField.replace("/", ""), responseField);
-                }
-                fields.put(conf.outputField.replace("/", ""), parsedRecord.get());
-                Record recToAddToBatchSplit = getContext().cloneRecord(inRec);
-                recToAddToBatchSplit.set(Field.create(fields));
-                recordsProcessed.add(recToAddToBatchSplit);
-              }
-              break;
-          }
-        }
-      } catch (DataParserException ex) {
-        throw new OnRecordErrorException(inRec,
-            Errors.HTTP_61,
-            getResponseStatus(response),
-            conf.outputField,
-            inRec.getHeader().getSourceId(),
-            ex.toString(),
-            ex
-        );
-      }
+  @VisibleForTesting
+  String getResolvedUrl() {
+    return resolvedUrl;
+  }
+
+  private boolean shouldMakeAnotherRequest(long start, boolean uninterrupted, boolean close, ResponseState responseState) {
+    boolean waitTimeNotExp = !waitTimeExpired(start);
+
+    boolean thereIsNextLink =
+        (((conf.pagination.mode == PaginationMode.LINK_FIELD) || (conf.pagination.mode == PaginationMode.LINK_HEADER)) &&
+        haveMorePages);
+
+    boolean isLink = conf.pagination.mode == PaginationMode.BY_PAGE || conf.pagination.mode == PaginationMode.BY_OFFSET;
+
+    HttpResponseActionConfigBean action = null;
+    int retryCounter = 0;
+    if (responseState.lastRequestTimedOut && responseState.lastStatus == ResponseState.TIMEOUT_KEY) {
+      action = timeoutActionConfig;
+      retryCounter = responseState.retryCountForStatus.getOrDefault(ResponseState.TIMEOUT_KEY, 0);
     } else {
-      throw new OnRecordErrorException(inRec,
-          Errors.HTTP_65,
-          getResponseStatus(response),
-          conf.outputField,
-          inRec.getHeader().getSourceId()
-      );
+      action = statusToActionConfigs.get(responseState.lastStatus);
+      retryCounter = responseState.retryCountForStatus.getOrDefault(responseState.lastStatus, 0);
     }
+    boolean numRetriesExceed = action != null && retryCounter > action.getMaxNumRetries();
 
-    return recordsProcessed;
+    boolean canPaginate = (conf.pagination.mode != PaginationMode.NONE &&
+                           conf.multipleValuesBehavior != MultipleValuesBehavior.FIRST_ONLY &&
+                           (thereIsNextLink || isLink));
+
+    boolean canContinue = canPaginate || (action != null);
+
+    return (waitTimeNotExp &&
+            uninterrupted &&
+            !appliedErrorAction &&
+            !appliedPassthroughAction &&
+            !close &&
+            canContinue &&
+            !numRetriesExceed) ||
+            renewedToken;
   }
 
-  private Record parseFileRefRecord(Record inRec, Response response, Field field, String parserId) {
-    Record currentRecord;
-    try {
-      final InputStream inputStream = field.getValueAsFileRef().createInputStream(getContext(),
-          InputStream.class
-      );
-      byte[] fieldData = IOUtils.toByteArray(inputStream);
-
-      try (DataParser parser = parserFactory.getParser(parserId, fieldData)) {
-        currentRecord = parser.parse();
-      }
-
-    } catch (IOException e) {
-      throw new OnRecordErrorException(
-          inRec,
-          Errors.HTTP_64,
-          getResponseStatus(response),
-          conf.outputField,
-          inRec.getHeader().getSourceId(),
-          e.getMessage(),
-          e
-      );
-    }
-    return currentRecord;
+  /**
+   * Returns true if the batchWaitTime has expired and we should return from produce
+   *
+   * @param start the time in milliseconds at which this produce call began
+   * @return whether or not to return the batch as-is
+   */
+  private boolean waitTimeExpired(long start) {
+    return (System.currentTimeMillis() - start) > conf.basic.maxWaitTime;
   }
 
-  private void reprocessIfRequired(SingleLaneBatchMaker batchMaker) {
-    Map<Record, Future<Response>> responses = new HashMap<>(resolvedRecords.size());
-    for (Map.Entry<Record, HeadersAndBody> entry : resolvedRecords.entrySet()) {
-      HeadersAndBody hb = entry.getValue();
-      Future<Response> responseFuture;
-      final AsyncInvoker asyncInvoker = hb.target.request().headers(hb.resolvedHeaders).async();
-      if (hb.requestBody != null) {
-        responseFuture = asyncInvoker.method(hb.method.getLabel(), Entity.entity(hb.requestBody, hb.contentType));
-      } else {
-        responseFuture = asyncInvoker.method(hb.method.getLabel());
-      }
-      responses.put(entry.getKey(), responseFuture);
-    }
+  /**
+   * Helper method to construct an HTTP request and fetch a response.
+   *
+   * @param target the target url to fetch.
+   * @param record the record for which we are making building the request.
+   */
+  private Future<Response> makeRequest(WebTarget target, Record record) {
+    MultivaluedMap<String, Object> resolvedHeaders = httpClientCommon.resolveHeaders(conf.headers, record);
+    String contentType = HttpStageUtil.getContentTypeWithDefault(resolvedHeaders, conf.defaultRequestContentType);
+    final AsyncInvoker asyncInvoker = target.request()
+        .property(OAuth1ClientSupport.OAUTH_PROPERTY_ACCESS_TOKEN,
+                  httpClientCommon.getAuthToken())
+        .headers(resolvedHeaders)
+        .async();
 
-    for (Map.Entry<Record, Future<Response>> entry : responses.entrySet()) {
-      try {
-        List<Record> recordsToAddBatch;
-        List<Record> output = new ArrayList<>();
-        processResponse(entry.getKey(),
-            entry.getValue(),
-            conf.maxRequestCompletionSecs,
-            true,
-            output,
-            System.currentTimeMillis()
-        );
-        Response reprocessResponse = reprocessResponse(entry, responses);
+    HttpMethod method = httpClientCommon.getHttpMethod(conf.httpMethod, conf.methodExpression, record);
+    Future<Response> futureResp = null;
 
-        if (reprocessResponse != null) {
-          recordsToAddBatch = processRecord(output.get(0), entry.getKey(), reprocessResponse);
-          for (Record record : recordsToAddBatch) {
-            batchMaker.addRecord(record);
-          }
-        }
-      } catch (OnRecordErrorException e) {
-        errorRecordHandler.onError(e);
-      }
-    }
-  }
+    long startTime = System.currentTimeMillis();
 
-  private Response reprocessResponse(
-      Map.Entry<Record, Future<Response>> entry, Map<Record, Future<Response>> responses
-  ) {
-    try {
-      return responses.get(entry.getKey()).get(conf.maxRequestCompletionSecs, TimeUnit.SECONDS);
-    } catch (InterruptedException | ExecutionException e) {
-      LOG.error(Errors.HTTP_03.getMessage(), getResponseStatus(), e.toString(), e);
-      throw new OnRecordErrorException(entry.getKey(), Errors.HTTP_03, getResponseStatus(), e.toString());
-    } catch (TimeoutException e) {
-      LOG.error("HTTP request future timed out: {}", e.toString(), e);
-      throw new OnRecordErrorException(entry.getKey(), Errors.HTTP_03, getResponseStatus(), e.toString());
+    rateLimiter.acquire();
+    if (conf.requestBody != null && !conf.requestBody.isEmpty() && method != HttpMethod.GET) {
+      RecordEL.setRecordInContext(bodyVars, record);
+      final String requestBody = bodyEval.eval(bodyVars, conf.requestBody, String.class);
+      resolvedRecords.put(record, new HeadersAndBody(resolvedHeaders, requestBody, contentType, method, target));
+      futureResp = asyncInvoker.method(method.getLabel(), Entity.entity(requestBody, contentType));
+    } else {
+      resolvedRecords.put(record, new HeadersAndBody(resolvedHeaders, null, null, method, target));
+      futureResp = asyncInvoker.method(method.getLabel());
     }
+    LOG.debug("Built request in {} ms", System.currentTimeMillis() - startTime);
+    return futureResp;
   }
 
   /**
@@ -723,31 +503,50 @@ public class HttpProcessor extends SingleLaneProcessor {
    * and continues to parse the response if it is deemed ok.
    *
    * @param record the current record to set in context for any expression evaluation
-   * @param responseFuture the async HTTP request future
+   * @param target the target url to fetch.
    * @param maxRequestCompletionSecs maximum time to wait for request completion (start to finish)
+   * @param failOn403 wheter to treat HTTP status 403 as a non recoverable error
+   * @param recordsResponse list of all the response recordsResponse obtained for the current record (including pagination)
+   * @param recordsPassthrough list of all the response recordsResponse obtained through exception handling
+   * @param start time at which this recrord began to be processed
+   *
    * @return parsed record from the request
    */
   private boolean processResponse(
       Record record,
-      Future<Response> responseFuture,
+      WebTarget target,
       long maxRequestCompletionSecs,
       boolean failOn403,
-      List<Record> records,
+      List<Record> recordsResponse,
+      List<Record> recordsPassthrough,
       long start
   ) {
     appliedRetryAction = false;
+    appliedErrorAction = false;
+    appliedPassthroughAction = false;
+    batchWaitTimeExpired = false;
     renewedToken = false;
     ResponseState responseState;
 
+    Future<Response> responseFuture = makeRequest(target, record);
+
     if (recordsToResponseState.containsKey(record)) {
       responseState = recordsToResponseState.get(record);
+      LOG.debug("Retrieved response in {} ms", System.currentTimeMillis() - start);
     } else {
+      LOG.debug("Response not retrieved. Elapsed time: {} ms", System.currentTimeMillis() - start);
       responseState = new ResponseState();
     }
 
     Response recordResponse = null;
     try {
       recordResponse = responseFuture.get(maxRequestCompletionSecs, TimeUnit.SECONDS);
+
+      if (waitTimeExpired(start)) {
+        batchWaitTimeExpired = true;
+        throw new SocketTimeoutException(TimeoutType.RECORD.getMessage());
+      }
+
       setResponse(recordResponse);
 
       InputStream responseBody = null;
@@ -773,37 +572,41 @@ public class HttpProcessor extends SingleLaneProcessor {
             r.set(Field.create(mapFields));
             createResponseHeaders(r, recordResponse);
             r.getHeader().setAttribute(REQUEST_STATUS_CONFIG_NAME, String.format("%d", getResponse().getStatus()));
-            records.add(r);
+            recordsResponse.add(r);
             return false;
           } else {
-            throw new OnRecordErrorException(record,
+            throw new OnRecordErrorException(
+                record,
                 Errors.HTTP_01,
                 recordResponse.getStatus(),
                 recordResponse.getStatusInfo().getReasonPhrase() + " " + responseBody
             );
           }
-
         } else {
-          final boolean statusChanged = responseState.lastStatus != responseStatus || responseState.lastRequestTimedOut;
-
-          final AtomicInteger retryCountObj = new AtomicInteger(responseState.retryCount);
+          boolean firstOccurrence =! responseState.retryCountForStatus.containsKey(responseStatus);
+          int retryCounter = responseState.retryCountForStatus.getOrDefault(responseStatus, 0);
+          final AtomicInteger retryCountObj = new AtomicInteger(retryCounter);
           final AtomicLong backoffExp = new AtomicLong(responseState.backoffIntervalExponential);
           final AtomicLong backoffLin = new AtomicLong(responseState.backoffIntervalLinear);
           String responseBodyString = extractResponseBodyStr(recordResponse);
-          HttpStageUtil.applyResponseAction(action,
-              statusChanged,
+          applyResponseAction(
+              action,
+              firstOccurrence,
               input -> new StageException(Errors.HTTP_14, responseStatus, responseBodyString),
               retryCountObj,
               backoffLin,
               backoffExp,
               record,
-              String.format("action defined for status %d (response: %s)", responseStatus, responseBodyString)
-          );
-          responseState.retryCount = retryCountObj.get();
+              String.format("action defined for status %d (response: %s)", responseStatus, responseBodyString),
+              recordsPassthrough,
+              false,
+              null);
+          responseState.retryCountForStatus.put(responseStatus, retryCountObj.get());
           responseState.backoffIntervalExponential = backoffExp.get();
           responseState.backoffIntervalLinear = backoffLin.get();
           responseState.lastRequestTimedOut = true;
-          appliedRetryAction = action.getAction() == ResponseAction.RETRY_EXPONENTIAL_BACKOFF ||
+          appliedRetryAction =
+              action.getAction() == ResponseAction.RETRY_EXPONENTIAL_BACKOFF ||
               action.getAction() == ResponseAction.RETRY_LINEAR_BACKOFF ||
               action.getAction() == ResponseAction.RETRY_IMMEDIATELY;
         }
@@ -811,51 +614,72 @@ public class HttpProcessor extends SingleLaneProcessor {
       resolvedRecords.remove(record);
       boolean close = false;
 
-      if (action != null) {
-        if (waitTimeExpired(start)) {
-          close = true;
-          errorRecordHandler.onError(Errors.HTTP_67, getResponseStatus());
-        }
-      } else {
-        close = parseResponse(record, responseBody, records);
+      if (action == null) {
+        close = parseResponse(record, responseBody, recordsResponse);
       }
 
       if (conf.httpMethod != HttpMethod.HEAD && responseBody == null && responseStatus != 204) {
         throw new OnRecordErrorException(record, Errors.HTTP_34, responseStatus);
-      } else if (responseStatus == 204 && records.isEmpty()) {
+      } else if (responseStatus == 204 && recordsResponse.isEmpty()) {
         Record recordEmpty = getContext().cloneRecord(record);
-        records.add(recordEmpty);
+        recordsResponse.add(recordEmpty);
       }
 
       responseState.lastRequestTimedOut = false;
       responseState.lastStatus = responseStatus;
       return close;
 
-    } catch (InterruptedException | ExecutionException | TimeoutException e) {
-        TimeoutType timeoutType = HttpStageUtil.findTimeoutType(e);
-        if (timeoutType == TimeoutType.NONE) {
-          LOG.error(Errors.HTTP_03.getMessage(), getResponseStatus(), e.toString(), e);
-          throw new OnRecordErrorException(record, Errors.HTTP_03, getResponseStatus(), e.toString());
-        }
-        final HttpResponseActionConfigBean actionConf = this.timeoutActionConfig;
-        final boolean firstTimeout = !responseState.lastRequestTimedOut;
-        final AtomicInteger retryCountObj = new AtomicInteger(responseState.retryCount);
-        final AtomicLong backoffExp = new AtomicLong(responseState.backoffIntervalExponential);
-        final AtomicLong backoffLin = new AtomicLong(responseState.backoffIntervalLinear);
-        HttpStageUtil.applyResponseAction(actionConf,
-            firstTimeout,
-            input -> new StageException(Errors.HTTP_18),
-            retryCountObj,
-            backoffLin,
-            backoffExp,
-            record,
-            "action defined for timeout" );
-        responseState.retryCount = retryCountObj.get();
-        responseState.backoffIntervalExponential = backoffExp.get();
-        responseState.backoffIntervalLinear = backoffLin.get();
-        responseState.lastRequestTimedOut = true;
-        return false;
-    } finally {
+    }
+    catch (InterruptedException | ExecutionException | TimeoutException | SocketTimeoutException e) {
+      responseState.lastRequestTimedOut = true;
+      responseState.lastStatus = ResponseState.TIMEOUT_KEY;
+      TimeoutType timeoutType = HttpStageUtil.findTimeoutType(e);
+      if (timeoutType == TimeoutType.NONE) {
+        responseState.lastRequestTimedOut = false;
+        LOG.error(Errors.HTTP_03.getMessage(), getResponseStatus(), e.toString(), e);
+        throw new OnRecordErrorException(record, Errors.HTTP_03, getResponseStatus(), e.toString());
+      }
+      final HttpResponseActionConfigBean actionConf = this.timeoutActionConfig;
+      boolean firstOccurrence = !responseState.retryCountForStatus.containsKey(ResponseState.TIMEOUT_KEY);
+      int retryCounter = responseState.retryCountForStatus.getOrDefault(ResponseState.TIMEOUT_KEY, 0);
+      final AtomicInteger retryCountObj = new AtomicInteger(retryCounter);
+      final AtomicLong backoffExp = new AtomicLong(responseState.backoffIntervalExponential);
+      final AtomicLong backoffLin = new AtomicLong(responseState.backoffIntervalLinear);
+      applyResponseAction(
+          actionConf,
+          firstOccurrence,
+          input -> new StageException(Errors.HTTP_18),
+          retryCountObj,
+          backoffLin,
+          backoffExp,
+          record,
+          "action defined for timeout",
+          recordsPassthrough,
+          true,
+          timeoutType
+      );
+      responseState.retryCountForStatus.put(ResponseState.TIMEOUT_KEY, retryCountObj.get());
+      responseState.backoffIntervalExponential = backoffExp.get();
+      responseState.backoffIntervalLinear = backoffLin.get();
+      return false;
+    } catch (OnRecordErrorException e) {
+      throw e;
+    } catch (Exception e) {
+      LOG.error(String.format("ProcessingException attempting to make request in HttpClientSource: %s",
+                              e.getMessage()),
+                e);
+      final Throwable cause = e.getCause();
+      Throwable reportEx = cause != null ? cause : e;
+      final StageException stageException = new StageException(
+          Errors.HTTP_32,
+          getResponseStatus(),
+          reportEx.toString(),
+          reportEx
+      );
+      LOG.error(stageException.getMessage());
+      throw stageException;
+    }
+    finally {
       recordsToResponseState.put(record, responseState);
       if (recordResponse != null) {
         recordResponse.close();
@@ -1027,6 +851,305 @@ public class HttpProcessor extends SingleLaneProcessor {
         header.setAttribute(conf.headerAttributePrefix + entry.getKey(), firstValue);
       }
     }
+  }
+
+  private void applyResponseAction (
+      HttpResponseActionConfigBean actionConfiguration,
+      boolean firstOccurence,
+      Function<Void, StageException> createConfiguredErrorFunction,
+      AtomicInteger retryCount,
+      AtomicLong backoffIntervalLinear,
+      AtomicLong backoffIntervalExponential,
+      Record inputRecord,
+      String errorRecordMessage,
+      List<Record> recordsPassthrough,
+      boolean forTimeout,
+      TimeoutType timeoutType) {
+    PassthroughAttributes passthroughAttributes = HttpStageUtil.applyResponseAction(
+        actionConfiguration,
+        firstOccurence,
+        createConfiguredErrorFunction,
+        retryCount,
+        backoffIntervalLinear,
+        backoffIntervalExponential,
+        inputRecord,
+        errorRecordMessage,
+        forTimeout,
+        timeoutType);
+
+    if (passthroughAttributes == null) {
+      return;
+    }
+
+    // throw new OnRecordErrorException(inputRecord, Errors.HTTP_100, errorRecordMessage);
+
+    if (passthroughAttributes.isSendToOutput() || passthroughAttributes.isSendToError()) {
+      inputRecord.getHeader().setAttribute(
+          PassthroughAttributes.HEADER_ERROR,
+          passthroughAttributes.getError().getMessage());
+      inputRecord.getHeader().setAttribute(
+         PassthroughAttributes.HEADER_STATUS,
+         "" + passthroughAttributes.getStatus());
+      if (passthroughAttributes.getTimeoutType() != null &&
+          !passthroughAttributes.getTimeoutType().equals(TimeoutType.NONE)) {
+        inputRecord.getHeader().setAttribute(
+            PassthroughAttributes.HEADER_TIMEOUT_TYPE,
+            "" + passthroughAttributes.getTimeoutType().getReason());
+      }
+      inputRecord.getHeader().setAttribute(
+          PassthroughAttributes.HEADER_ACTION,
+          passthroughAttributes.getAction().getLabel());
+      inputRecord.getHeader().setAttribute(
+          PassthroughAttributes.HEADER_RETRIES,
+          String.format("%d out of %d", passthroughAttributes.getRetries(), actionConfiguration.getMaxNumRetries()));
+      if (passthroughAttributes.isSendToError()) {
+        appliedErrorAction = true;
+        Record cloneRecord = getContext().cloneRecord(inputRecord);
+        errorRecordHandler.onError(new OnRecordErrorException(cloneRecord, passthroughAttributes.getError()));
+      }
+      if (passthroughAttributes.isSendToOutput()) {
+        appliedPassthroughAction = true;
+        recordsPassthrough.add(inputRecord);
+      }
+    }
+  }
+
+  private List<Record> processRecord(Record currentRecord, Record inRec, Response response) {
+    List<Record> recordsProcessed = new ArrayList<>();
+    if (currentRecord == null) {
+      return recordsProcessed;
+    }
+    Record firstRecord = currentRecord;
+    Field field = inRec.get();
+    if (field != null) {
+      try {
+        final String parserId = String.format("%s_%s_%s",
+            getContext().getStageInfo().getInstanceName(),
+            firstRecord.getHeader().getSourceId(),
+            conf.outputField
+        );
+        // Check the type is correct and if it's a File Ref then it is parsed using the input stream.
+        switch (field.getType()) {
+          case LIST_MAP:
+          case LIST:
+          case MAP:
+          case STRING:
+          case BYTE_ARRAY:
+            // Do nothing...
+            break;
+          case FILE_REF:
+            currentRecord = parseFileRefRecord(inRec, response, field, parserId);
+            break;
+          default:
+            throw new OnRecordErrorException(
+                inRec,
+                Errors.HTTP_61,
+                getResponseStatus(response),
+                conf.outputField,
+                field.getType().name()
+            );
+        }
+
+        Object currentRecordValue = currentRecord.get().getValue();
+        List<Field> currentRecordList;
+        if (currentRecordValue instanceof List) {
+          currentRecordList = (List<Field>) currentRecordValue;
+        } else {
+          currentRecordList = Collections.singletonList(currentRecord.get());
+        }
+
+        if (!appliedPassthroughAction && !appliedErrorAction) {
+          // No results
+          if (currentRecordList.isEmpty()) {
+            /*
+            When batch timeout expires we already sent the record to the error queue
+            When this happens, we have no response (not just an empty response). So,
+            the missing values behavior does not apply.
+            */
+            if (!batchWaitTimeExpired) {
+              switch (conf.missingValuesBehavior) {
+                case SEND_TO_ERROR:
+                  LOG.error(Errors.HTTP_68.getMessage(), getResponseStatus(response));
+                  Record cloneRecord = getContext().cloneRecord(inRec);
+                  errorRecordHandler.onError(
+                      new OnRecordErrorException(cloneRecord,
+                      Errors.HTTP_68,
+                      getResponseStatus(response)
+                  ));
+                  break;
+                case PASS_RECORD_ON:
+                  Record recToAddToBatch = getContext().cloneRecord(inRec);
+                  recordsProcessed.add(recToAddToBatch);
+                  break;
+                default:
+                  throw new IllegalStateException("Unknown missing value behavior: " + conf.missingValuesBehavior);
+              }
+            }
+          } else {
+            switch (conf.multipleValuesBehavior) {
+              case FIRST_ONLY:
+                Map<String, Field> fieldsMap = new HashMap<>((Map<String, Field>) inRec.get().getValue());
+                Field resFieldHeaders = createResponseHeaders(inRec, response);
+                if (resFieldHeaders != null) {
+                  fieldsMap.put(conf.headerOutputField.replace("/", ""), resFieldHeaders);
+                }
+                fieldsMap.put(conf.outputField.replace("/", ""), currentRecordList.get(0));
+                Record recToAddToBatch = getContext().cloneRecord(inRec);
+                recToAddToBatch.set(Field.create(fieldsMap));
+                recordsProcessed.add(recToAddToBatch);
+                break;
+              case ALL_AS_LIST:
+                Map<String, Field> fs = new HashMap<>((Map<String, Field>) inRec.get().getValue());
+                Field resField = createResponseHeaders(inRec, response);
+                if (resField != null) {
+                  fs.put(conf.headerOutputField.replace("/", ""), resField);
+                }
+                fs.put(conf.outputField.replace("/", ""), Field.create(currentRecordList));
+                Record recToAddToBatchList = getContext().cloneRecord(inRec);
+                recToAddToBatchList.set(Field.create(fs));
+                recordsProcessed.add(recToAddToBatchList);
+                break;
+              case SPLIT_INTO_MULTIPLE_RECORDS:
+                for (Field value : currentRecordList) {
+                  Record parsedRecord = getContext().createRecord("");
+                  parsedRecord.set(value);
+                  Map<String, Field> fields = new HashMap<>((Map<String, Field>) inRec.get().getValue());
+                  Field responseField = createResponseHeaders(inRec, response);
+                  if (responseField != null) {
+                    fields.put(conf.headerOutputField.replace("/", ""), responseField);
+                  }
+                  fields.put(conf.outputField.replace("/", ""), parsedRecord.get());
+                  Record recToAddToBatchSplit = getContext().cloneRecord(inRec);
+                  recToAddToBatchSplit.set(Field.create(fields));
+                  recordsProcessed.add(recToAddToBatchSplit);
+                }
+                break;
+            }
+          }
+        } else {
+          if (appliedPassthroughAction) {
+            recordsProcessed.add(inRec);
+          }
+        }
+      } catch (DataParserException ex) {
+        throw new OnRecordErrorException(
+            inRec,
+            Errors.HTTP_61,
+            getResponseStatus(response),
+            conf.outputField,
+            inRec.getHeader().getSourceId(),
+            ex.toString(),
+            ex
+        );
+      }
+    } else {
+      throw new OnRecordErrorException(
+          inRec,
+          Errors.HTTP_65,
+          getResponseStatus(response),
+          conf.outputField,
+          inRec.getHeader().getSourceId()
+      );
+    }
+
+    return recordsProcessed;
+  }
+
+  private Record parseFileRefRecord(Record inRec, Response response, Field field, String parserId) {
+    Record currentRecord;
+    try {
+      final InputStream inputStream = field.getValueAsFileRef().createInputStream(
+          getContext(),
+          InputStream.class);
+      byte[] fieldData = IOUtils.toByteArray(inputStream);
+      try (DataParser parser = parserFactory.getParser(parserId, fieldData)) {
+        currentRecord = parser.parse();
+      }
+    } catch (IOException e) {
+      throw new OnRecordErrorException(
+          inRec,
+          Errors.HTTP_64,
+          getResponseStatus(response),
+          conf.outputField,
+          inRec.getHeader().getSourceId(),
+          e.getMessage(),
+          e
+      );
+    }
+    return currentRecord;
+  }
+
+  @Deprecated
+  private void completeRequest(Record record, Future<Response> future) {
+    /* Code block ready to be deleted, as it should not be used ay more.
+    try {
+      future.get(conf.maxRequestCompletionSecs, TimeUnit.SECONDS);
+    } catch (InterruptedException | ExecutionException e) {
+      LOG.error(Errors.HTTP_03.getMessage(), e.toString(), e);
+      throw new OnRecordErrorException(record, Errors.HTTP_03, e.toString());
+    } catch (TimeoutException e) {
+      LOG.error("HTTP request future timed out", e.toString(), e);
+      throw new OnRecordErrorException(record, Errors.HTTP_03, e.toString());
+    }
+     */
+  }
+
+  @Deprecated
+  private void reprocessIfRequired(SingleLaneBatchMaker batchMaker) {
+    /* Code block ready to be deleted, as it should not be used ay more.
+    Map<Record, Future<Response>> responses = new HashMap<>(resolvedRecords.size());
+    for (Map.Entry<Record, HeadersAndBody> entry : resolvedRecords.entrySet()) {
+      HeadersAndBody hb = entry.getValue();
+      Future<Response> responseFuture;
+      final AsyncInvoker asyncInvoker = hb.target.request().headers(hb.resolvedHeaders).async();
+      if (hb.requestBody != null) {
+        responseFuture = asyncInvoker.method(hb.method.getLabel(), Entity.entity(hb.requestBody, hb.contentType));
+      } else {
+        responseFuture = asyncInvoker.method(hb.method.getLabel());
+      }
+      responses.put(entry.getKey(), responseFuture);
+    }
+
+    for (Map.Entry<Record, Future<Response>> entry : responses.entrySet()) {
+      try {
+        List<Record> recordsToAddBatch;
+        List<Record> output = new ArrayList<>();
+        processResponse(entry.getKey(),
+            entry.getValue(),
+            conf.maxRequestCompletionSecs,
+            true,
+            output,
+            System.currentTimeMillis()
+        );
+        Response reprocessResponse = reprocessResponse(entry, responses);
+
+        if (reprocessResponse != null && !output.isEmpty()) {
+          recordsToAddBatch = processRecord(output.get(0), entry.getKey(), reprocessResponse);
+          for (Record record : recordsToAddBatch) {
+            batchMaker.addRecord(record);
+          }
+        }
+      } catch (OnRecordErrorException e) {
+        errorRecordHandler.onError(e);
+      }
+    }
+     */
+  }
+
+  @Deprecated
+  private Response reprocessResponse(Map.Entry<Record, Future<Response>> entry, Map<Record, Future<Response>> responses) {
+    /* Code block ready to be deleted, as it should not be used ay more.
+    try {
+      return responses.get(entry.getKey()).get(conf.maxRequestCompletionSecs, TimeUnit.SECONDS);
+    } catch (InterruptedException | ExecutionException e) {
+      LOG.error(Errors.HTTP_03.getMessage(), getResponseStatus(), e.toString(), e);
+      throw new OnRecordErrorException(entry.getKey(), Errors.HTTP_03, getResponseStatus(), e.toString());
+    } catch (TimeoutException e) {
+      LOG.error("HTTP request future timed out: {}", e.toString(), e);
+      throw new OnRecordErrorException(entry.getKey(), Errors.HTTP_03, getResponseStatus(), e.toString());
+    }
+     */
+    return null;
   }
 
   Response getResponse() {

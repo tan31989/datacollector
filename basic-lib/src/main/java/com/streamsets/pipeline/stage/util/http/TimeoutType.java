@@ -18,20 +18,26 @@ package com.streamsets.pipeline.stage.util.http;
 import com.streamsets.pipeline.api.Label;
 
 public enum TimeoutType {
-  UNKNOWN(null),
-  CONNECTION("connect timed out"),
-  READ("Read timed out"),
-  REQUEST("Timeout waiting for task"),
-  RECORD(null),
-  NONE(null);
+  UNKNOWN(null, "Unknown timeout reason"),
+  CONNECTION("connect timed out", "Connection timeout"),
+  READ("Read timed out", "Read timeout"),
+  REQUEST("Timeout waiting for task", "Request timeout"),
+  RECORD("Timeout waiting for record response", "Record processing timeout"),
+  NONE(null, null);
 
   private final String message;
+  private final String reason;
 
-  TimeoutType(String message) {
+  TimeoutType(String message, String reason) {
     this.message = message;
+    this.reason = reason;
   }
 
   public String getMessage() {
-    return message;
+    return this.message;
+  }
+
+  public String getReason() {
+    return this.reason;
   }
 }
