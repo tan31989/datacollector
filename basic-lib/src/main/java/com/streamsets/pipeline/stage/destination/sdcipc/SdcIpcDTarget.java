@@ -45,6 +45,7 @@ import com.streamsets.pipeline.api.base.configurablestage.DTarget;
     "config.tlsConfigBean.keyStorePassword",
     "config.tlsConfigBean.keyStoreAlgorithm"
 })
+@Deprecated
 @GenerateResourceBundle
 public class SdcIpcDTarget extends DTarget {
 

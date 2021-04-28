@@ -43,6 +43,7 @@ import java.util.List;
     upgraderDef = "upgrader/AerospikeDTarget.yaml",
     onlineHelpRefUrl = "index.html?contextID=task_j3q_tpr_4cb"
 )
+@Deprecated
 @ConfigGroups(value = Groups.class)
 @GenerateResourceBundle
 public class AerospikeDTarget extends DTarget {

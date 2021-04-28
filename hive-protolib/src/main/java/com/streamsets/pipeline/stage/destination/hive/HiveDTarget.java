@@ -36,6 +36,7 @@ import java.util.Map;
     upgraderDef = "upgrader/HiveDTarget.yaml",
     onlineHelpRefUrl ="index.html?contextID=task_cx3_lhh_ht"
 )
+@Deprecated
 @ConfigGroups(value = Groups.class)
 @GenerateResourceBundle
 public class HiveDTarget extends DTarget {

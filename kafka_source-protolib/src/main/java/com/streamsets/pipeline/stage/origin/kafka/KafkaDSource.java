@@ -41,6 +41,7 @@ import com.streamsets.pipeline.kafka.api.KafkaOriginGroups;
   upgraderDef = "upgrader/KafkaDSource.yaml",
   onlineHelpRefUrl ="index.html?contextID=task_npx_xgf_vq"
 )
+@Deprecated
 @RawSource(rawSourcePreviewer = KafkaRawSourcePreviewer.class, mimeType = "*/*")
 @ConfigGroups(value = KafkaOriginGroups.class)
 @HideConfigs(value = {"kafkaConfigBean.dataFormatConfig.compression"})

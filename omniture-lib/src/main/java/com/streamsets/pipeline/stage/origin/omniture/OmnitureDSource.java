@@ -38,7 +38,7 @@ import com.streamsets.pipeline.api.credential.CredentialValue;
     upgraderDef = "upgrader/OmnitureDSource.yaml",
     onlineHelpRefUrl ="index.html?contextID=task_of4_wpw_1s"
 )
-
+@Deprecated
 @ConfigGroups(Groups.class)
 @GenerateResourceBundle
 public class OmnitureDSource extends DSource {

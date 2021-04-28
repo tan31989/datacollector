@@ -31,7 +31,7 @@ import com.streamsets.pipeline.api.base.configurablestage.DTarget;
   upgraderDef = "upgrader/KineticaDTarget.yaml",
   onlineHelpRefUrl ="index.html?contextID=task_r1q_vxg_qbb"
 )
-
+@Deprecated
 @ConfigGroups(Groups.class)
 @GenerateResourceBundle
 public class KineticaDTarget extends DTarget {

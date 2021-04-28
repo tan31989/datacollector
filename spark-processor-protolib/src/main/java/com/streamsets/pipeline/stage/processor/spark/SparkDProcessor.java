@@ -36,6 +36,7 @@ import java.util.concurrent.Semaphore;
     onlineHelpRefUrl ="index.html?contextID=task_g1p_gqn_zx",
     privateClassLoader = true
 )
+@Deprecated
 @GenerateResourceBundle
 @ConfigGroups(Groups.class)
 public class SparkDProcessor extends DProcessor {

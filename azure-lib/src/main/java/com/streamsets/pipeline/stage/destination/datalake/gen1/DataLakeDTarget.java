@@ -42,6 +42,7 @@ import com.streamsets.pipeline.api.base.configurablestage.DTarget;
     "dataLakeConfig.hdfsConfDir",
     "dataLakeConfig.hdfsConfigs"
 })
+@Deprecated
 @GenerateResourceBundle
 public class DataLakeDTarget extends DTarget {
 

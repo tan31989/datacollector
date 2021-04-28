@@ -45,6 +45,7 @@ import com.streamsets.pipeline.api.base.configurablestage.DSourceOffsetCommitter
     "configs.tlsConfigBean.trustStorePassword",
     "configs.tlsConfigBean.trustStoreAlgorithm"
 })
+@Deprecated
 @GenerateResourceBundle
 public class SdcIpcDSource extends DSourceOffsetCommitter {
 

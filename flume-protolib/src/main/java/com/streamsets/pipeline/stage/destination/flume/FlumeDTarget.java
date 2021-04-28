@@ -34,6 +34,7 @@ import com.streamsets.pipeline.api.base.configurablestage.DTarget;
 )
 @ConfigGroups(value = Groups.class)
 @GenerateResourceBundle
+@Deprecated
 public class FlumeDTarget extends DTarget {
 
   @ConfigDefBean()

@@ -58,6 +58,7 @@ import static com.streamsets.pipeline.config.OriginAvroSchemaSource.SOURCE;
     "spoolDirConfig.dataFormatConfig.subject",
     "spoolDirConfig.dataFormatConfig.schemaId"
 })
+@Deprecated
 @GenerateResourceBundle
 public class DataLakeDSource extends DPushSource {
 

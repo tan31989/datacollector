@@ -58,6 +58,7 @@ import com.streamsets.pipeline.stage.origin.lib.OuterDataParserFormatConfig;
     "httpConfigs.serviceName",
     "httpConfigs.needGatewayAuth"
 })
+@Deprecated
 @GenerateResourceBundle
 public class NiFiHttpServerDPushSource extends DPushSource {
 
