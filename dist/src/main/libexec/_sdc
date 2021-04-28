@@ -94,6 +94,30 @@ SDC_EXTERNAL_RESOURCES=${SDC_EXTERNAL_RESOURCES:=${SDC_HOME}/externalResources}
 SDC_RESOURCES=${SDC_RESOURCES:=${SDC_EXTERNAL_RESOURCES}/resources}
 
 ############################## DEPLOYMENT INTEGRATION
+try_fetch_env_for_deployment_type() {
+  case $STREAMSETS_DEPLOYMENT_TYPE in
+  "" | SELF)
+    CSP_ENV_FILE=""
+    export STREAMSETS_DEPLOYMENT_TYPE="SELF"
+    ;;
+  EC2)
+    CSP_ENV_FILE=${SDC_HOME}/libexec/csp-envs/ec2-env.sh
+    ;;
+  *)
+    CSP_ENV_FILE=""
+    echo "Unknown STREAMSETS_DEPLOYMENT_TYPE: ${STREAMSETS_DEPLOYMENT_TYPE}"
+    ;;
+  esac
+  if [[ ! -z ${CSP_ENV_FILE} ]]; then
+    echo "Loading Deployment Bootstrap environment for ${STREAMSETS_DEPLOYMENT_TYPE}"
+    if [ -f ${CSP_ENV_FILE} ]; then
+      source ${CSP_ENV_FILE}
+    else
+      echo "Deployment environment for ${STREAMSETS_DEPLOYMENT_TYPE} not found"
+    fi
+  fi
+}
+
 if [[ ${DEPLOYMENT_INSTALL} -eq 0 ]]; then
   # not running within a deployment engine install run
 
@@ -105,6 +129,8 @@ if [[ ${DEPLOYMENT_INSTALL} -eq 0 ]]; then
   reportEvent() {
     echo ${1} - ${4}
   }
+
+  try_fetch_env_for_deployment_type
 
   # detect if the engine is configured to run as part of a deployment
   # we need the SCH URL, deployment ID, deployment token and boostrap deployment scripts to be avail
@@ -123,6 +149,7 @@ if [[ ${DEPLOYMENT_INSTALL} -eq 0 ]]; then
     DEPLOYMENT_RUN=1
   fi
 else
+  try_fetch_env_for_deployment_type
   if [ -z ${STREAMSETS_DEPLOYMENT_SCH_URL} ]; then
     echo "ERROR - STREAMSETS_DEPLOYMENT_SCH_URL not set"
     exit 1
@@ -421,28 +448,6 @@ check_curl_and_tar_installed() {
 }
 
 run_bootstrap() {
-  case $STREAMSETS_DEPLOYMENT_TYPE in
-  "" | SELF)
-    CSP_ENV_FILE=""
-    export STREAMSETS_DEPLOYMENT_TYPE="SELF"
-    ;;
-  EC2)
-    CSP_ENV_FILE=${SDC_HOME}/libexec/csp-envs/ec2-env.sh
-    ;;
-  *)
-    CSP_ENV_FILE=""
-    echo "Unknown STREAMSETS_DEPLOYMENT_TYPE: ${STREAMSETS_DEPLOYMENT_TYPE}"
-    ;;
-  esac
-  if [[ ! -z ${CSP_ENV_FILE} ]]; then
-    echo "Loading Deployment Bootstrap environment for ${STREAMSETS_DEPLOYMENT_TYPE}"
-    if [ -f ${CSP_ENV_FILE} ]; then
-      source ${CSP_ENV_FILE}
-    else
-      echo "Deployment Bootstrap environment for ${STREAMSETS_DEPLOYMENT_TYPE} not found"
-    fi
-  fi
-
   STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR=${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR:=${SDC_DIST}}
 
   if [[ ! -z "${STREAMSETS_DEPLOYMENT_SCH_URL}" ]] && [[ ! -z "${STREAMSETS_DEPLOYMENT_ID}" ]] && [[ ! -z "${STREAMSETS_DEPLOYMENT_TOKEN}" ]]; then
