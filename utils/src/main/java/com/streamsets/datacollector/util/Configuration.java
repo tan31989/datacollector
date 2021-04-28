@@ -56,7 +56,9 @@ public class Configuration implements com.streamsets.pipeline.api.Configuration 
     private String unresolvedValue;
 
     protected Ref(String unresolvedValue) {
-      this.unresolvedValue = unresolvedValue;
+      if (unresolvedValue != null) {
+        this.unresolvedValue = unresolvedValue.trim();
+      }
     }
 
     public abstract String getPrefix();

@@ -438,4 +438,60 @@ public class TestConfiguration {
     conf.set("a", "${exec(\"script.sh\")}");
     conf.get("a", null);
   }
+
+  @Test
+  public void testRefsConfigsWithBlankSpaces() throws IOException {
+    File dir = new File("target", UUID.randomUUID().toString());
+    Assert.assertTrue(dir.mkdirs());
+    Configuration.setFileRefsBaseDir(dir);
+
+    Writer writer = new FileWriter(new File(dir, "hello.txt"));
+    IOUtils.write("secret", writer);
+    writer.close();
+    Configuration conf = new Configuration();
+
+    String home = System.getenv("HOME");
+
+    conf.set("a", " @hello.txt@    ");
+    conf.set("aa", "  ${file(\"hello.txt\")}   ");
+    conf.set("aaa", "  ${file('hello.txt')} ");
+    conf.set("b", " $HOME$   ");
+    conf.set("bb", "   ${env(\"HOME\")}   ");
+    conf.set("bbb", " ${env('HOME')}     ");
+    conf.set("x", " X   ");
+    Assert.assertEquals("secret", conf.get("a", null));
+    Assert.assertEquals("secret", conf.get("aa", null));
+    Assert.assertEquals("secret", conf.get("aaa", null));
+    Assert.assertEquals(home, conf.get("b", null));
+    Assert.assertEquals(home, conf.get("bb", null));
+    Assert.assertEquals(home, conf.get("bbb", null));
+    Assert.assertEquals("X", conf.get("x", null));
+
+    Configuration uconf = conf.getUnresolvedConfiguration();
+    Assert.assertEquals("@hello.txt@", uconf.get("a", null));
+    Assert.assertEquals("${file(\"hello.txt\")}", uconf.get("aa", null));
+    Assert.assertEquals("${file('hello.txt')}", uconf.get("aaa", null));
+    Assert.assertEquals("$HOME$", uconf.get("b", null));
+    Assert.assertEquals("${env(\"HOME\")}", uconf.get("bb", null));
+    Assert.assertEquals("${env('HOME')}", uconf.get("bbb", null));
+    Assert.assertEquals("X", uconf.get("x", null));
+
+    writer = new FileWriter(new File(dir, "config.properties"));
+    conf.save(writer);
+    writer.close();
+
+    conf = new Configuration();
+    Reader reader = new FileReader(new File(dir, "config.properties"));
+    conf.load(reader);
+    reader.close();
+
+    uconf = conf.getUnresolvedConfiguration();
+    Assert.assertEquals("@hello.txt@", uconf.get("a", null));
+    Assert.assertEquals("${file(\"hello.txt\")}", uconf.get("aa", null));
+    Assert.assertEquals("${file('hello.txt')}", uconf.get("aaa", null));
+    Assert.assertEquals("$HOME$", uconf.get("b", null));
+    Assert.assertEquals("${env(\"HOME\")}", uconf.get("bb", null));
+    Assert.assertEquals("${env('HOME')}", uconf.get("bbb", null));
+    Assert.assertEquals("X", uconf.get("x", null));
+  }
 }
