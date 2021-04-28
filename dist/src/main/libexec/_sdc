@@ -109,15 +109,19 @@ if [[ ${DEPLOYMENT_INSTALL} -eq 0 ]]; then
   # detect if the engine is configured to run as part of a deployment
   # we need the SCH URL, deployment ID, deployment token and boostrap deployment scripts to be avail
   if [[ -f ${SDC_CONF}/dpm-url.txt ]] && [[ -f ${SDC_CONF}/deployment.id ]] && [[ -f ${SDC_CONF}/deployment-token.txt ]]; then
-    DEPLOYMENT_RUN=1
     SCH_URL_FROM_FILE=$(cat ${SDC_CONF}/dpm-url.txt)
     ID_FROM_FILE=$(cat ${SDC_CONF}/deployment.id)
     TOKEN_FROM_FILE=$(cat ${SDC_CONF}/deployment-token.txt)
-    STREAMSETS_DEPLOYMENT_SCH_URL=${STREAMSETS_DEPLOYMENT_SCH_URL:=${SCH_URL_FROM_FILE}}
-    STREAMSETS_DEPLOYMENT_ID=${STREAMSETS_DEPLOYMENT_ID:=${ID_FROM_FILE}}
-    STREAMSETS_DEPLOYMENT_TOKEN=${STREAMSETS_DEPLOYMENT_TOKEN:=${TOKEN_FROM_FILE}}
   fi
 
+  STREAMSETS_DEPLOYMENT_SCH_URL=${STREAMSETS_DEPLOYMENT_SCH_URL:=${SCH_URL_FROM_FILE}}
+  STREAMSETS_DEPLOYMENT_ID=${STREAMSETS_DEPLOYMENT_ID:=${ID_FROM_FILE}}
+  STREAMSETS_DEPLOYMENT_TOKEN=${STREAMSETS_DEPLOYMENT_TOKEN:=${TOKEN_FROM_FILE}}
+
+  if [[ -n "${STREAMSETS_DEPLOYMENT_SCH_URL}" ]] && [[ -n "${STREAMSETS_DEPLOYMENT_ID}" ]] && [[ -n "${STREAMSETS_DEPLOYMENT_TOKEN}" ]]; then
+    echo "Engine running in Deployment Mode"
+    DEPLOYMENT_RUN=1
+  fi
 else
   if [ -z ${STREAMSETS_DEPLOYMENT_SCH_URL} ]; then
     echo "ERROR - STREAMSETS_DEPLOYMENT_SCH_URL not set"
