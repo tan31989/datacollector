@@ -15,7 +15,6 @@
  */
 package com.streamsets.pipeline.stage.processor.http;
 
-
 import com.amazonaws.util.IOUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
@@ -130,9 +129,11 @@ public class HttpProcessor extends SingleLaneProcessor {
   private static class ResponseState {
     public static final Integer TIMEOUT_KEY = -1;
 
-    private long backoffIntervalLinear = 0;
-    private long backoffIntervalExponential = 0;
-    // Retries count at status level. Key 0 (TIMEOUT_KEY) indicates timeout of any kind.
+    // Backoff exponential at status level. Key 0 (TIMEOUT_KEY) indicates timeout (of any kind).
+    private Map<Integer, Long> backoffIntervalExponentialForStatus = new HashMap<>();
+    // Backoff linear at status level. Key 0 (TIMEOUT_KEY) indicates timeout (of any kind).
+    private Map<Integer, Long> backoffIntervalLinearForStatus = new HashMap<>();
+    // Retries count at status level. Key 0 (TIMEOUT_KEY) indicates timeout (of any kind).
     private Map<Integer, Integer> retryCountForStatus = new HashMap<>();
     private int lastStatus = 0;
     private boolean lastRequestTimedOut;
@@ -141,8 +142,8 @@ public class HttpProcessor extends SingleLaneProcessor {
     public String toString() {
       return "ResponseState "
           + "{"
-          + "backoffIntervalLinear=" + backoffIntervalLinear + " - "
-          + "backoffIntervalExponential=" + backoffIntervalExponential + " - "
+          + "backoffIntervalLinear=" + StringUtils.join(backoffIntervalLinearForStatus, " - ") + " - "
+          + "backoffIntervalExponential=" + StringUtils.join(backoffIntervalExponentialForStatus, " - ") + " - "
           + "retryCount=" + StringUtils.join(retryCountForStatus, " - ") + " - "
           + "lastStatus=" + lastStatus  + " - "
           + "lastRequestTimedOut=" + lastRequestTimedOut
@@ -230,6 +231,8 @@ public class HttpProcessor extends SingleLaneProcessor {
     boolean close = false;
     while (records.hasNext()) {
 
+      resetStorage();
+
       Record record = records.next();
 
       boolean uninterrupted = true;
@@ -307,21 +310,21 @@ public class HttpProcessor extends SingleLaneProcessor {
           batchMaker.addRecord(recToAdd);
         }
       }
-    }
 
-    if (!resolvedRecords.isEmpty()) {
-      for (Map.Entry<Record, HeadersAndBody> entry : resolvedRecords.entrySet()) {
-        LOG.debug(String.format(
-            "Removing expired resolved record: %s a %s b %s c %s, %s",
-            entry.getKey(),
-            entry.getValue().requestBody,
-            entry.getValue().contentType,
-            entry.getValue().target,
-            entry.getValue().method));
+      if (!resolvedRecords.isEmpty()) {
+        for (Map.Entry<Record, HeadersAndBody> entry : resolvedRecords.entrySet()) {
+          LOG.debug(String.format(
+              "Removing expired resolved record: %s a %s b %s c %s, %s",
+              entry.getKey(),
+              entry.getValue().requestBody,
+              entry.getValue().contentType,
+              entry.getValue().target,
+              entry.getValue().method));
+        }
       }
+      resetStorage();
     }
-    resolvedRecords.clear();
-    recordsToResponseState.clear();
+    resetStorage();
   }
 
   /**
@@ -342,6 +345,11 @@ public class HttpProcessor extends SingleLaneProcessor {
       default:
         break;
     }
+  }
+
+  private void resetStorage() {
+    resolvedRecords.clear();
+    recordsToResponseState.clear();
   }
 
   @VisibleForTesting
@@ -585,9 +593,11 @@ public class HttpProcessor extends SingleLaneProcessor {
         } else {
           boolean firstOccurrence =! responseState.retryCountForStatus.containsKey(responseStatus);
           int retryCounter = responseState.retryCountForStatus.getOrDefault(responseStatus, 0);
+          long backoffIntervalExponential = responseState.backoffIntervalExponentialForStatus.getOrDefault(responseStatus, 0L);
+          long backoffIntervalLinear = responseState.backoffIntervalLinearForStatus.getOrDefault(responseStatus, 0L);
           final AtomicInteger retryCountObj = new AtomicInteger(retryCounter);
-          final AtomicLong backoffExp = new AtomicLong(responseState.backoffIntervalExponential);
-          final AtomicLong backoffLin = new AtomicLong(responseState.backoffIntervalLinear);
+          final AtomicLong backoffExp = new AtomicLong(backoffIntervalExponential);
+          final AtomicLong backoffLin = new AtomicLong(backoffIntervalLinear);
           String responseBodyString = extractResponseBodyStr(recordResponse);
           applyResponseAction(
               action,
@@ -602,8 +612,9 @@ public class HttpProcessor extends SingleLaneProcessor {
               false,
               null);
           responseState.retryCountForStatus.put(responseStatus, retryCountObj.get());
-          responseState.backoffIntervalExponential = backoffExp.get();
-          responseState.backoffIntervalLinear = backoffLin.get();
+          responseState.backoffIntervalExponentialForStatus.put(responseStatus, backoffExp.get());
+          responseState.backoffIntervalLinearForStatus.put(responseStatus, backoffLin.get());
+
           responseState.lastRequestTimedOut = true;
           appliedRetryAction =
               action.getAction() == ResponseAction.RETRY_EXPONENTIAL_BACKOFF ||
@@ -639,12 +650,18 @@ public class HttpProcessor extends SingleLaneProcessor {
         LOG.error(Errors.HTTP_03.getMessage(), getResponseStatus(), e.toString(), e);
         throw new OnRecordErrorException(record, Errors.HTTP_03, getResponseStatus(), e.toString());
       }
+      if (timeoutType == TimeoutType.RECORD) {
+        errorRecordHandler.onError(Errors.HTTP_67, getResponseStatus());
+        return true;
+      }
       final HttpResponseActionConfigBean actionConf = this.timeoutActionConfig;
       boolean firstOccurrence = !responseState.retryCountForStatus.containsKey(ResponseState.TIMEOUT_KEY);
       int retryCounter = responseState.retryCountForStatus.getOrDefault(ResponseState.TIMEOUT_KEY, 0);
+      long backoffIntervalExponential = responseState.backoffIntervalExponentialForStatus.getOrDefault(ResponseState.TIMEOUT_KEY, 0L);
+      long backoffIntervalLinear = responseState.backoffIntervalLinearForStatus.getOrDefault(ResponseState.TIMEOUT_KEY, 0L);
       final AtomicInteger retryCountObj = new AtomicInteger(retryCounter);
-      final AtomicLong backoffExp = new AtomicLong(responseState.backoffIntervalExponential);
-      final AtomicLong backoffLin = new AtomicLong(responseState.backoffIntervalLinear);
+      final AtomicLong backoffExp = new AtomicLong(backoffIntervalExponential);
+      final AtomicLong backoffLin = new AtomicLong(backoffIntervalLinear);
       applyResponseAction(
           actionConf,
           firstOccurrence,
@@ -659,8 +676,8 @@ public class HttpProcessor extends SingleLaneProcessor {
           timeoutType
       );
       responseState.retryCountForStatus.put(ResponseState.TIMEOUT_KEY, retryCountObj.get());
-      responseState.backoffIntervalExponential = backoffExp.get();
-      responseState.backoffIntervalLinear = backoffLin.get();
+      responseState.backoffIntervalExponentialForStatus.put(ResponseState.TIMEOUT_KEY, backoffExp.get());
+      responseState.backoffIntervalLinearForStatus.put(ResponseState.TIMEOUT_KEY, backoffLin.get());
       return false;
     } catch (OnRecordErrorException e) {
       throw e;

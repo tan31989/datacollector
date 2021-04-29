@@ -287,10 +287,10 @@ public abstract class HttpStageUtil {
 
     if (actionConf.getAction().equals(ResponseAction.ERROR_RECORD) ||
         (!actionConf.getAction().equals(ResponseAction.STAGE_ERROR) &&
-         actionConf.getMaxNumRetries() > 0 &&
-         retryCount.get() > actionConf.getMaxNumRetries()) ||
-        (timeoutType != null &&
-         timeoutType.equals(TimeoutType.RECORD))) {
+         ((actionConf.getMaxNumRetries() > 0 &&
+           retryCount.get() > actionConf.getMaxNumRetries()) ||
+          (timeoutType != null &&
+           timeoutType.equals(TimeoutType.RECORD))))) {
         PassthroughAttributes passthroughAttributes = buildPassthroughAttributes(
           actionConf,
           firstOccurrence ? 0 : retryCount.get() - 1,
