@@ -28,6 +28,7 @@ import com.streamsets.pipeline.api.base.configurablestage.DTarget;
     label = "Azure Data Lake Storage Gen1",
     description = "Writes data to Azure Data Lake Storage Gen1",
     icon = "data-lake-store-gen1.png",
+    beta = true,
     producesEvents = true,
     beta = true,
     upgraderDef = "upgrader/DataLakeDTarget.yaml",
