@@ -29,6 +29,7 @@ import com.streamsets.pipeline.lib.event.WholeFileProcessedEvent;
     description = "Writes data to Azure Data Lake Storage (Legacy)",
     icon = "data-lake-store-gen1.png",
     producesEvents = true,
+    beta = true,
     eventDefs = {WholeFileProcessedEvent.class},
     upgraderDef = "upgrader/DataLakeDTargetLegacy.yaml",
     onlineHelpRefUrl = "index.html?contextID=task_jfl_nf4_zx"
