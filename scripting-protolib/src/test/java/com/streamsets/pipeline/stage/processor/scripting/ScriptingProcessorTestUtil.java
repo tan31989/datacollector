@@ -182,13 +182,13 @@ public class ScriptingProcessorTestUtil {
         .build();
     runner.runInit();
     try {
-
       Record record1 = RecordCreator.create();
       record1.set(Field.create("Hello"));
       Record record2 = RecordCreator.create();
       record2.set(Field.create("Bye"));
       List<Record> input = Arrays.asList(record1, record2);
-      runner.runProcess(input);
+      StageRunner.Output output = runner.runProcess(input);
+      assertEquals(0, output.getRecords().get("lane").size());
     } finally {
       runner.runDestroy();
     }

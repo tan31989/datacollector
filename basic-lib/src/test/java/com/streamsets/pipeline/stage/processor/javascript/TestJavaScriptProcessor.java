@@ -225,12 +225,12 @@ public class TestJavaScriptProcessor {
   }
 
 
-  @Test(expected = StageException.class)
+  @Test
   public void testBatchOnErrorDiscard() throws Exception {
     testBatchModeOnErrorHandling(OnRecordError.DISCARD);
   }
 
-  @Test(expected = StageException.class)
+  @Test
   public void testBatchOnErrorToError() throws Exception {
     testBatchModeOnErrorHandling(OnRecordError.TO_ERROR);
   }

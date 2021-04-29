@@ -22,6 +22,7 @@ import com.streamsets.pipeline.api.Record;
 import com.streamsets.pipeline.api.StageBehaviorFlags;
 import com.streamsets.pipeline.api.StageDef;
 import com.streamsets.pipeline.api.StageException;
+import com.streamsets.pipeline.api.base.OnRecordErrorException;
 import com.streamsets.pipeline.sdk.RecordCreator;
 import com.streamsets.pipeline.stage.processor.scripting.ProcessingMode;
 import com.streamsets.pipeline.stage.processor.scripting.ScriptingProcessorTestUtil;
@@ -124,12 +125,12 @@ public class TestGroovyProcessor {
     ScriptingProcessorTestUtil.verifyBatchModeOnErrorHandling(GroovyDProcessor.class, processor, onRecordError);
   }
 
-  @Test(expected = StageException.class)
+  @Test
   public void testBatchOnErrorDiscard() throws Exception {
     testBatchModeOnErrorHandling(OnRecordError.DISCARD);
   }
 
-  @Test(expected = StageException.class)
+  @Test
   public void testBatchOnErrorToError() throws Exception {
     testBatchModeOnErrorHandling(OnRecordError.TO_ERROR);
   }
