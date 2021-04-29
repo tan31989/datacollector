@@ -35,9 +35,11 @@ import com.streamsets.pipeline.api.base.configurablestage.DProcessor;
         ExecutionMode.CLUSTER_MESOS_STREAMING,
         ExecutionMode.EMR_BATCH
     },
+    beta = true,
     upgraderDef = "upgrader/DatabricksMLDProcessor.yaml",
     onlineHelpRefUrl = "index.html?contextID=task_bgq_g3r_1fb"
 )
+@Deprecated
 @GenerateResourceBundle
 @ConfigGroups(Groups.class)
 public class DatabricksMLDProcessor extends DProcessor {
