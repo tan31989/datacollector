@@ -22,23 +22,21 @@ import com.streamsets.pipeline.api.Source;
 import com.streamsets.pipeline.api.StageDef;
 import com.streamsets.pipeline.stage.origin.hdfs.cluster.ClusterHdfsDSource;
 
-@StageDef(
-    version = 1,
+@StageDef(version = 1,
     label = "MapR FS",
     description = "Reads from a MapR filesystem",
     execution = ExecutionMode.CLUSTER_BATCH,
     libJarsRegex = {"avro-\\d+.*", "avro-mapred.*"},
     icon = "mapr_xd.png",
+    beta = true,
     privateClassLoader = false,
     upgraderDef = "upgrader/ClusterMapRFSDSource.yaml",
-    onlineHelpRefUrl ="index.html?contextID=task_h2p_mb4_lx"
-)
-@HideConfigs(value =
-                 {
-                     "clusterHDFSConfigBean.dataFormatConfig.compression",
-                     "clusterHDFSConfigBean.dataFormatConfig.includeCustomDelimiterInTheText"
-                 }
-)
+    onlineHelpRefUrl = "index.html?contextID=task_h2p_mb4_lx")
+@HideConfigs(value = {
+    "clusterHDFSConfigBean.dataFormatConfig.compression",
+    "clusterHDFSConfigBean.dataFormatConfig.includeCustomDelimiterInTheText"
+})
+@Deprecated
 @GenerateResourceBundle
 public class ClusterMapRFSDSource extends ClusterHdfsDSource {
 
@@ -46,7 +44,7 @@ public class ClusterMapRFSDSource extends ClusterHdfsDSource {
 
   @Override
   protected Source createSource() {
-    if(clusterHDFSConfigBean.hdfsUri == null || clusterHDFSConfigBean.hdfsUri.isEmpty()) {
+    if (clusterHDFSConfigBean.hdfsUri == null || clusterHDFSConfigBean.hdfsUri.isEmpty()) {
       clusterHDFSConfigBean.hdfsUri = "maprfs:///";
     }
     clusterMapRFSSource = new ClusterMapRFSSource(clusterHDFSConfigBean);
