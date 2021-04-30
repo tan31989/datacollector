@@ -88,6 +88,10 @@ upgrades:
       - setConfig:
           name: conf.responseTimeoutActionConfig.passRecord
           value: false
+      - setConfig:
+          lookForName: conf.responseStatusActionConfigs
+          elseName: conf.responseStatusActionConfigs
+          elseValue: []
       - iterateListConfig:
           name: conf.responseStatusActionConfigs
           actions:
