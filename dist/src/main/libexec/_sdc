@@ -535,6 +535,11 @@ if [ $EXEC -eq 1 ]; then
        -libsCommonLibDir "${LIBS_COMMON_LIB_DIR}" ${EXTRA_OPTIONS}
 
   status=$?
+  # Remove credential cache if exists
+  #
+  if [ -f ${SDC_DATA}/sdc-krb5.ticketCache ]; then
+    rm ${SDC_DATA}/sdc-krb5.ticketCache
+  fi
 else
   while true; do
     if [[ ${DEPLOYMENT_RUN} -eq 1 ]]; then
