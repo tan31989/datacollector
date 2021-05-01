@@ -56,7 +56,7 @@
       "autoArrange": "Auto Arrange",
       "batchNumber": "Batch Number",
       "betaStageTooltip": "This is a technology preview stage, do not use in production",
-      "deprecatedStageTooltip": "This stage is deprecated and will be removed in Data Collector 5.0.",
+      "deprecatedStageTooltip": "This stage is deprecated and may be removed in a future release.",
       "cancel": "Cancel",
       "changeRule": "Change Rule",
       "captured": "Captured",

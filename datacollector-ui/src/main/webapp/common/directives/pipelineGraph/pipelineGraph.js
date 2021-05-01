@@ -930,7 +930,7 @@ angular.module('pipelineGraphDirectives', [])
         .attr('xlink:href', '/assets/deprecated.svg')
         .attr('class', 'graph-bootstrap-tooltip')
         .attr('data-placement', 'top')
-        .attr('title', 'This stage is deprecated and will be removed in Data Collector 5.0.');
+        .attr('title', 'This stage is deprecated and may be removed in a future release.');
 
 
       // remove old nodes
