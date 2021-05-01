@@ -42,6 +42,7 @@ import javax.ws.rs.client.Client;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -296,7 +297,10 @@ public abstract class HttpStageUtil {
           firstOccurrence ? 0 : retryCount.get() - 1,
           forTimeout,
           timeoutType);
-      if (actionConf.isPassRecord()) {
+      if (actionConf.isPassRecord() &&
+          (timeoutType == null ||
+           (timeoutType != null &&
+            !timeoutType.equals(TimeoutType.RECORD)))) {
         // It is possible to send both to error and pass through except for batch timeout
         passthroughAttributes.setSendToOutput(true);
       }
@@ -332,7 +336,8 @@ public abstract class HttpStageUtil {
 
   public static TimeoutType findTimeoutType(Exception eException) {
     Throwable throwable = SocketTimeoutException.class.isInstance(eException) ||
-                          TimeoutException.class.isInstance(eException) ?
+                          TimeoutException.class.isInstance(eException) ||
+                          ConnectException.class.isInstance(eException)?
                           eException :
                           ExceptionUtils.findSpecificCause(eException, SocketTimeoutException.class);
     if (throwable == null) {

@@ -137,6 +137,7 @@ public class HttpProcessor extends SingleLaneProcessor {
     private Map<Integer, Integer> retryCountForStatus = new HashMap<>();
     private int lastStatus = 0;
     private boolean lastRequestTimedOut;
+    private boolean discardForBatchTimeout = false;
 
     @Override
     public String toString() {
@@ -298,16 +299,21 @@ public class HttpProcessor extends SingleLaneProcessor {
         }
       } while (shouldMakeAnotherRequest(start, uninterrupted, close, recordsToResponseState.get(record)));
 
-      if (!appliedPassthroughAction) {
-        if (recordsResponse != null && response != null) {
-          addToBatchRecords = processRecord(currentRecord, record, response);
-          for (Record recToAdd : addToBatchRecords) {
+      if (recordsToResponseState.get(record).discardForBatchTimeout) {
+        errorRecordHandler.onError(Errors.HTTP_67, getResponseStatus());
+        resetStorage();
+      } else {
+        if (!appliedPassthroughAction) {
+          if (recordsResponse != null && response != null) {
+            addToBatchRecords = processRecord(currentRecord, record, response);
+            for (Record recToAdd : addToBatchRecords) {
+              batchMaker.addRecord(recToAdd);
+            }
+          }
+        } else {
+          for (Record recToAdd : recordsPassthrough) {
             batchMaker.addRecord(recToAdd);
           }
-        }
-      } else {
-        for (Record recToAdd : recordsPassthrough) {
-          batchMaker.addRecord(recToAdd);
         }
       }
 
@@ -428,6 +434,11 @@ public class HttpProcessor extends SingleLaneProcessor {
 
   private boolean shouldMakeAnotherRequest(long start, boolean uninterrupted, boolean close, ResponseState responseState) {
     boolean waitTimeNotExp = !waitTimeExpired(start);
+
+    if (!waitTimeNotExp) {
+      responseState.discardForBatchTimeout = true;
+      return false;
+    }
 
     boolean thereIsNextLink =
         (((conf.pagination.mode == PaginationMode.LINK_FIELD) || (conf.pagination.mode == PaginationMode.LINK_HEADER)) &&
