@@ -41,9 +41,9 @@ public class TestMapRStreamsSourceUpgrader {
   }
 
   @Test
-  public void testV5toV6() {
-    Mockito.doReturn(5).when(context).getFromVersion();
-    Mockito.doReturn(6).when(context).getToVersion();
+  public void testV6toV7() {
+    Mockito.doReturn(6).when(context).getFromVersion();
+    Mockito.doReturn(7).when(context).getToVersion();
 
     String stageConfigPath = "maprstreamsSourceConfigBean";
 

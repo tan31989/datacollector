@@ -220,3 +220,8 @@ upgrades:
           value: "PLAIN"
           elseName: conf.connectionConfig.connection.securityConfig.saslMechanism
           elseValue: "GSSAPI"
+  - toVersion: 10
+    actions:
+      - setConfig:
+          name: conf.overrideConfigurations
+          value: false

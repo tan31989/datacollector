@@ -49,6 +49,8 @@ upgrades:
       - setConfig:
           name: maprstreamsSourceConfigBean.dataFormatConfig.csvUnivocityCommentMarker
           value: ${"#"}
+  - toVersion: 7
+    actions:
       - setConfig:
           name: maprstreamsSourceConfigBean.overrideConfigurations
           value: false

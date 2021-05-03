@@ -238,7 +238,6 @@ public class TestKafkaSourceUpgrader {
 
     UpgraderTestUtils.assertExists(configs, kafkaSecurityProtocolPath, "SASL_PLAINTEXT");
     UpgraderTestUtils.assertExists(configs, kafkaMechanismPath, "PLAIN");
-    UpgraderTestUtils.assertExists(configs, stageConfigPath + ".overrideConfigurations", false);
   }
 
   @Test
@@ -246,17 +245,24 @@ public class TestKafkaSourceUpgrader {
     Mockito.doReturn(14).when(context).getFromVersion();
     Mockito.doReturn(15).when(context).getToVersion();
 
-    Map<String, String> kafkaConsumerConfigs = new HashMap<>();
-    kafkaConsumerConfigs.put("auto.offset.reset", "latest");
+    String stageConfigPath = "kafkaConfigBean";
 
-    configs.add(new Config("kafkaConsumerConfigs", kafkaConsumerConfigs));
-    configs.add(new Config("kafkaAutoOffsetReset", KafkaAutoOffsetReset.LATEST));
-    Assert.assertFalse(kafkaConsumerConfigs.isEmpty());
+    final List<Map<String, String>> kafkaClientConfigs = new LinkedList<>();
+    Map<String, String> configMap = new HashMap<>();
+    configMap.put("key", "auto.offset.reset");
+    configMap.put("value","latest");
+    kafkaClientConfigs.add(configMap);
 
-    upgrader.upgrade(configs, context);
+    configs.add(new Config(stageConfigPath + ".kafkaConsumerConfigs", kafkaClientConfigs));
+    configs.add(new Config(stageConfigPath + ".kafkaAutoOffsetReset", KafkaAutoOffsetReset.LATEST));
+    Assert.assertFalse(kafkaClientConfigs.isEmpty());
 
-    Assert.assertEquals(KafkaAutoOffsetReset.LATEST, configs.stream().filter(config -> "kafkaAutoOffsetReset".equals(
+    configs = upgrader.upgrade(configs, context);
+
+    UpgraderTestUtils.assertExists(configs, stageConfigPath + ".overrideConfigurations", false);
+    Assert.assertEquals(KafkaAutoOffsetReset.LATEST, configs.stream().filter(config -> (stageConfigPath + ".kafkaAutoOffsetReset").equals(
         config.getName())).findFirst().get().getValue());
-    Assert.assertEquals(1, kafkaConsumerConfigs.size());
+    Assert.assertEquals(0, ((List)configs.stream().filter(config -> (stageConfigPath + ".kafkaConsumerConfigs").equals(
+        config.getName())).findFirst().get().getValue()).size());
   }
 }

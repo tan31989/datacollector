@@ -156,7 +156,16 @@ public class TestMultiKafkaSourceUpgrader {
 
     UpgraderTestUtils.assertExists(configs, kafkaSecurityProtocolPath, "SASL_PLAINTEXT");
     UpgraderTestUtils.assertExists(configs, kafkaMechanismPath, "PLAIN");
-    UpgraderTestUtils.assertExists(configs, stageConfigPath + ".overrideConfigurations", false);
+  }
 
+  @Test
+  public void testV9toV10() {
+    Mockito.doReturn(9).when(context).getFromVersion();
+    Mockito.doReturn(10).when(context).getToVersion();
+
+    String stageConfigPath = "conf";
+
+    configs = upgrader.upgrade(configs, context);
+    UpgraderTestUtils.assertExists(configs, stageConfigPath + ".overrideConfigurations", false);
   }
 }

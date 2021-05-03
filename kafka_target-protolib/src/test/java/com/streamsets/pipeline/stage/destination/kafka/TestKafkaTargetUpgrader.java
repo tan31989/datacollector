@@ -343,6 +343,24 @@ public class TestKafkaTargetUpgrader {
 
     UpgraderTestUtils.assertExists(configs, kafkaSecurityProtocolPath, "SASL_PLAINTEXT");
     UpgraderTestUtils.assertExists(configs, kafkaMechanismPath, "PLAIN");
+  }
+
+  @Test
+  public void testV10toV11() {
+    final URL yamlResource = ClassLoader.getSystemClassLoader().getResource("upgrader/KafkaDTarget.yaml");
+    final SelectorStageUpgrader upgrader = new SelectorStageUpgrader(
+        "stage",
+        new KafkaTargetUpgrader(),
+        yamlResource
+    );
+    List<Config> configs = new ArrayList<>();
+    StageUpgrader.Context context = Mockito.mock(StageUpgrader.Context.class);
+    Mockito.doReturn(10).when(context).getFromVersion();
+    Mockito.doReturn(11).when(context).getToVersion();
+
+    String stageConfigPath = "conf";
+
+    configs = upgrader.upgrade(configs, context);
     UpgraderTestUtils.assertExists(configs, stageConfigPath + ".overrideConfigurations", false);
   }
 }

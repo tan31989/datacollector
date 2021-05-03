@@ -226,11 +226,11 @@ upgrades:
           value: "PLAIN"
           elseName: kafkaConfigBean.connectionConfig.connection.securityConfig.saslMechanism
           elseValue: "GSSAPI"
-      - setConfig:
-          name: kafkaConfigBean.overrideConfigurations
-          value: false
   - toVersion: 15
     actions:
       - configStringMapRemove:
           name: kafkaConfigBean.kafkaConsumerConfigs
           key: auto.offset.reset
+      - setConfig:
+          name: kafkaConfigBean.overrideConfigurations
+          value: false
