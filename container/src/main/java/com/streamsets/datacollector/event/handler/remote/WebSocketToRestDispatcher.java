@@ -207,7 +207,8 @@ public class WebSocketToRestDispatcher {
             tResponse.setHeaders(responseHeaders);
 
             try {
-              if (contentType != null && contentType.contains(MediaType.TEXT_PLAIN)) {
+              if (contentType != null && (contentType.contains(MediaType.TEXT_PLAIN) ||
+                  contentType.contains(MediaType.TEXT_HTML))) {
                 data = response.readEntity(String.class);
               } else {
                 data = response.readEntity(Object.class);
