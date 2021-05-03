@@ -18,6 +18,7 @@ package com.streamsets.datacollector.restapi;
 import com.google.common.collect.Lists;
 import com.streamsets.datacollector.config.ConnectionDefinition;
 import com.streamsets.datacollector.config.StageDefinition;
+import com.streamsets.datacollector.config.StageLibraryDefinition;
 import com.streamsets.datacollector.definition.ConnectionVerifierDefinition;
 import com.streamsets.datacollector.el.RuleELRegistry;
 import com.streamsets.datacollector.main.BuildInfo;
@@ -26,8 +27,11 @@ import com.streamsets.datacollector.restapi.bean.ConnectionDefinitionJson;
 import com.streamsets.datacollector.restapi.bean.ConnectionsJson;
 import com.streamsets.datacollector.restapi.bean.DefinitionsJson;
 import com.streamsets.datacollector.restapi.bean.StageDefinitionMinimalJson;
+import com.streamsets.datacollector.restapi.bean.StageLibraryExtrasJson;
+import com.streamsets.datacollector.restapi.bean.StageLibraryInfoJson;
 import com.streamsets.datacollector.restapi.configuration.JsonConfigurator;
 import com.streamsets.datacollector.stagelibrary.StageLibraryTask;
+import com.streamsets.datacollector.util.RestException;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -39,10 +43,13 @@ import org.mockito.internal.util.collections.Sets;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.Response;
+import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 
 public class TestStageLibraryResource extends JerseyTest {
 
@@ -225,5 +232,132 @@ public class TestStageLibraryResource extends JerseyTest {
     Assert.assertEquals(1, definitionsJson.getStageDefinitionMap().keySet().size());
     Assert.assertTrue(definitionsJson.getStageDefinitionMap()
         .containsKey(stageDefinition1.getName() + "::" + stageDefinition1.getVersion()));
+  }
+
+  @Test
+  public void testGetLoadedStageLibraries() {
+    StageLibraryTask stageLibraryTask = Mockito.mock(StageLibraryTask.class);
+    BuildInfo buildInfo = Mockito.mock(BuildInfo.class);
+    Mockito.when(buildInfo.getVersion()).thenReturn("3.22.0");
+    StageLibraryResource resource = new StageLibraryResource(
+        stageLibraryTask,
+        buildInfo,
+        Mockito.mock(RuntimeInfo.class)
+    );
+
+    StageLibraryDefinition stageLibraryDefinition1 = Mockito.mock(StageLibraryDefinition.class);
+    Mockito.when(stageLibraryDefinition1.getName()).thenReturn("streamsets-datacollector-azure-lib");
+    Mockito.when(stageLibraryDefinition1.getLabel()).thenReturn("Azure");
+
+    StageLibraryDefinition stageLibraryDefinition2 = Mockito.mock(StageLibraryDefinition.class);
+    Mockito.when(stageLibraryDefinition2.getName()).thenReturn("streamsets-datacollector-hdp_3_1-lib");
+    Mockito.when(stageLibraryDefinition2.getLabel()).thenReturn("HDP 3.1.0");
+
+    Mockito.when(stageLibraryTask.getLoadedStageLibraries())
+        .thenReturn(Lists.newArrayList(stageLibraryDefinition1, stageLibraryDefinition2));
+
+    Response response = resource.getLoadedStageLibraries();
+    Assert.assertNotNull(response.getEntity());
+    List<StageLibraryInfoJson> stageLibraryInfoJsonList = (List<StageLibraryInfoJson>) response.getEntity();
+    Assert.assertNotNull(stageLibraryInfoJsonList);
+    Assert.assertEquals(2, stageLibraryInfoJsonList.size());
+
+    Assert.assertEquals("streamsets-datacollector-azure-lib", stageLibraryInfoJsonList.get(0).getLibraryId());
+    Assert.assertEquals("Azure", stageLibraryInfoJsonList.get(0).getLibraryLabel());
+    Assert.assertEquals("streamsets-datacollector-hdp_3_1-lib", stageLibraryInfoJsonList.get(1).getLibraryId());
+    Assert.assertEquals("HDP 3.1.0", stageLibraryInfoJsonList.get(1).getLibraryLabel());
+  }
+
+  @Test
+  public void testGetUserStageLibrariesNames() {
+    RuntimeInfo runtimeInfo = Mockito.mock(RuntimeInfo.class);
+    BuildInfo buildInfo = Mockito.mock(BuildInfo.class);
+    Mockito.when(buildInfo.getVersion()).thenReturn("3.22.0");
+    StageLibraryResource resource = new StageLibraryResource(
+        Mockito.mock(StageLibraryTask.class),
+        buildInfo,
+        runtimeInfo
+    );
+
+    File userLibsDir = new File("target", UUID.randomUUID().toString());
+    Assert.assertTrue(userLibsDir.mkdirs());
+
+    Mockito.when(runtimeInfo.getUserLibsDir()).thenReturn(userLibsDir.getAbsolutePath());
+
+    Response response = resource.getUserStageLibrariesNames();
+    Assert.assertNotNull(response.getEntity());
+    List<StageLibraryExtrasJson> stageLibraryExtrasJsonList = (List<StageLibraryExtrasJson>) response.getEntity();
+    Assert.assertNotNull(stageLibraryExtrasJsonList);
+    Assert.assertEquals(0, stageLibraryExtrasJsonList.size());
+
+    File userStageLib = new File(userLibsDir, "customer-stage-lib");
+    Assert.assertTrue(userStageLib.mkdirs());
+
+    response = resource.getUserStageLibrariesNames();
+    Assert.assertNotNull(response.getEntity());
+    stageLibraryExtrasJsonList = (List<StageLibraryExtrasJson>) response.getEntity();
+    Assert.assertNotNull(stageLibraryExtrasJsonList);
+    Assert.assertEquals(1, stageLibraryExtrasJsonList.size());
+    Assert.assertEquals("customer-stage-lib", stageLibraryExtrasJsonList.get(0).getFileName());
+  }
+
+  @Test
+  public void testGetResourcesFileNames() throws IOException {
+    RuntimeInfo runtimeInfo = Mockito.mock(RuntimeInfo.class);
+    BuildInfo buildInfo = Mockito.mock(BuildInfo.class);
+    Mockito.when(buildInfo.getVersion()).thenReturn("3.22.0");
+    StageLibraryResource resource = new StageLibraryResource(
+        Mockito.mock(StageLibraryTask.class),
+        buildInfo,
+        runtimeInfo
+    );
+
+    File resourcesDir = new File("target", UUID.randomUUID().toString());
+    Assert.assertTrue(resourcesDir.mkdirs());
+
+    Mockito.when(runtimeInfo.getResourcesDir()).thenReturn(resourcesDir.getAbsolutePath());
+
+    Response response = resource.getResourcesFileNames();
+    Assert.assertNotNull(response.getEntity());
+    List<StageLibraryExtrasJson> stageLibraryExtrasJsonList = (List<StageLibraryExtrasJson>) response.getEntity();
+    Assert.assertNotNull(stageLibraryExtrasJsonList);
+    Assert.assertEquals(0, stageLibraryExtrasJsonList.size());
+
+    File sampleResourceFile = new File(resourcesDir, "sample.txt");
+    Assert.assertTrue(sampleResourceFile.createNewFile());
+
+    response = resource.getResourcesFileNames();
+    Assert.assertNotNull(response.getEntity());
+    stageLibraryExtrasJsonList = (List<StageLibraryExtrasJson>) response.getEntity();
+    Assert.assertNotNull(stageLibraryExtrasJsonList);
+    Assert.assertEquals(1, stageLibraryExtrasJsonList.size());
+    Assert.assertEquals("sample.txt", stageLibraryExtrasJsonList.get(0).getFileName());
+  }
+
+
+  @Test
+  public void testDeleteResourcesFile() throws IOException, RestException {
+    RuntimeInfo runtimeInfo = Mockito.mock(RuntimeInfo.class);
+    BuildInfo buildInfo = Mockito.mock(BuildInfo.class);
+    Mockito.when(buildInfo.getVersion()).thenReturn("3.22.0");
+    StageLibraryResource resource = new StageLibraryResource(
+        Mockito.mock(StageLibraryTask.class),
+        buildInfo,
+        runtimeInfo
+    );
+
+    File resourcesDir = new File("target", UUID.randomUUID().toString());
+    Assert.assertTrue(resourcesDir.mkdirs());
+    File sampleResourceFile = new File(resourcesDir, "sample.txt");
+    Assert.assertTrue(sampleResourceFile.createNewFile());
+
+    Mockito.when(runtimeInfo.getResourcesDir()).thenReturn(resourcesDir.getAbsolutePath());
+
+    List<StageLibraryExtrasJson> stageLibraryExtrasJsonList = Collections.singletonList(
+        new StageLibraryExtrasJson(sampleResourceFile.getAbsolutePath(), null, sampleResourceFile.getName())
+    );
+
+    resource.deleteResourcesFile(stageLibraryExtrasJsonList);
+    Assert.assertEquals(0, Objects.requireNonNull(resourcesDir.listFiles()).length);
   }
 }

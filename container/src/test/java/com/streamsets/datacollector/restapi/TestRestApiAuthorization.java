@@ -300,6 +300,12 @@ public class TestRestApiAuthorization {
     list.add(new RestApi("/rest/v1/stageLibraries/extras/list", Method.GET, AuthzRole.ADMIN));
     list.add(new RestApi("/rest/v1/stageLibraries/extras/foo/upload", Method.POST, AuthzRole.ADMIN));
     list.add(new RestApi("/rest/v1/stageLibraries/extras/delete", Method.POST, AuthzRole.ADMIN));
+    list.add(new RestApi("/rest/v1/loadedStageLibraries", Method.GET, AuthzRole.ADMIN));
+    list.add(new RestApi("/rest/v1/externalResources/download", Method.GET, AuthzRole.ADMIN));
+    list.add(new RestApi("/rest/v1/userStageLibraries/list", Method.GET, AuthzRole.ADMIN));
+    list.add(new RestApi("/rest/v1/resources/list", Method.GET, AuthzRole.ADMIN));
+    list.add(new RestApi("/rest/v1/resources/upload", Method.POST, AuthzRole.ADMIN));
+    list.add(new RestApi("/rest/v1/resources/delete", Method.POST, AuthzRole.ADMIN));
 
     list.add(new RestApi("/rest/v1/system/logs", Method.GET,
         AuthzRole.ADMIN, AuthzRole.CREATOR, AuthzRole.MANAGER));

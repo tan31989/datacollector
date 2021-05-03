@@ -56,6 +56,8 @@ public abstract class RuntimeInfo {
   public static final String SAMPLE_PIPELINES_DATA_DIR = ".sample-pipelines.dir";
   public static final String LOG_DIR = ".log.dir";
   public static final String RESOURCES_DIR = ".resources.dir";
+  public static final String USER_LIBS_DIR = ".userLibs.dir";
+  public static final String EXTERNAL_RESOURCES_DIR = ".externalResources.dir";
   public static final String LIBEXEC_DIR = ".libexec.dir";
   public static final String ASTER_CLIENT_LIB_DIR = ".asterClientLib.dir";
   public static final String STATIC_WEB_DIR = ".static-web.dir";
@@ -86,6 +88,7 @@ public abstract class RuntimeInfo {
   public static final String LOG4J_PROPERTIES = "-log4j.properties";
 
   private static final String STREAMSETS_LIBRARIES_EXTRA_DIR_SYS_PROP = "STREAMSETS_LIBRARIES_EXTRA_DIR";
+  private static final String SDC_EXTERNAL_RESOURCES_SYS_PROP = "SDC_EXTERNAL_RESOURCES";
 
   protected static final String BASE_HTTP_URL_ATTR = "%s.base.http.url";
 
@@ -206,6 +209,14 @@ public abstract class RuntimeInfo {
 
   public String getLibsExtraDir() {
     return System.getProperty(STREAMSETS_LIBRARIES_EXTRA_DIR_SYS_PROP, null);
+  }
+
+  public String getUserLibsDir() {
+    return System.getProperty(propertyPrefix + USER_LIBS_DIR, null);
+  }
+
+  public String getExternalResourcesDir() {
+    return System.getProperty(propertyPrefix + EXTERNAL_RESOURCES_DIR, getRuntimeDir() + "/externalResources");
   }
 
   public boolean hasAttribute(String key) {

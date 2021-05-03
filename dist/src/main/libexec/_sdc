@@ -273,6 +273,7 @@ USER_LIBRARIES_DIR="${USER_LIBRARIES_DIR:=${SDC_EXTERNAL_RESOURCES}/user-libs}"
 # add system properties for configurable directories
 SDC_JAVA_OPTS="${SDC_JAVA_OPTS} -Dsdc.libraries.dir=${STREAMSETS_LIBRARIES_DIR} \
     -Dsdc.librariesExtras.dir=${STREAMSETS_LIBRARIES_EXTRA_DIR} \
+    -Dsdc.externalResources.dir=${SDC_EXTERNAL_RESOURCES} \
     -Dsdc.rootLib.dir=${ROOT_LIB_DIR} \
     -Dsdc.bootstrapLib.dir=${BOOTSTRAP_LIB_DIR} \
     -Dsdc.apiLib.dir=${API_LIB_DIR} \
@@ -405,7 +406,7 @@ fi
 
 if [ $VERBOSE -eq 1 ];
 then
-  echo "SDC Agent:"
+  echo "Data Collector Engine:"
   echo "  DIST                           : ${SDC_DIST}"
   echo "  HOME                           : ${SDC_HOME}"
   echo "  CONF                           : ${SDC_CONF}"

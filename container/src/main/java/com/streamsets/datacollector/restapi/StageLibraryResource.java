@@ -17,6 +17,7 @@ package com.streamsets.datacollector.restapi;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.streamsets.datacollector.classpath.ClasspathValidatorResult;
+import com.streamsets.datacollector.cluster.TarFileCreator;
 import com.streamsets.datacollector.config.ConnectionDefinition;
 import com.streamsets.datacollector.config.ServiceDefinition;
 import com.streamsets.datacollector.config.StageDefinition;
@@ -35,8 +36,9 @@ import com.streamsets.datacollector.restapi.bean.PipelineFragmentDefinitionJson;
 import com.streamsets.datacollector.restapi.bean.PipelineRulesDefinitionJson;
 import com.streamsets.datacollector.restapi.bean.StageDefinitionJson;
 import com.streamsets.datacollector.restapi.bean.StageLibraryExtrasJson;
-import com.streamsets.datacollector.stagelibrary.StageLibraryUtil;
+import com.streamsets.datacollector.restapi.bean.StageLibraryInfoJson;
 import com.streamsets.datacollector.stagelibrary.StageLibraryTask;
+import com.streamsets.datacollector.stagelibrary.StageLibraryUtil;
 import com.streamsets.datacollector.util.AuthzRole;
 import com.streamsets.datacollector.util.RestException;
 import com.streamsets.datacollector.util.Version;
@@ -50,8 +52,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.security.DenyAll;
 import javax.annotation.security.PermitAll;
@@ -66,11 +66,13 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -85,13 +87,10 @@ import java.util.stream.Collectors;
 @DenyAll
 @RequiresCredentialsDeployed
 public class StageLibraryResource {
-
-  private static final Logger LOG = LoggerFactory.getLogger(StageLibraryResource.class);
-
   private static final String DEFAULT_ICON_FILE = "PipelineDefinition-bundle.properties";
   private static final String PNG_MEDIA_TYPE = "image/png";
   private static final String SVG_MEDIA_TYPE = "image/svg+xml";
-  private static final String REPO_URL = "REPO_URL";
+  private static final String EMPTY_FILE = ".empty";
   private static final String STAGE_LIB_JARS_DIR = "lib";
   private static final String STAGE_LIB_CONF_DIR = "etc";
 
@@ -247,15 +246,26 @@ public class StageLibraryResource {
       authorizations = @Authorization(value = "basic"))
   @Produces(MediaType.APPLICATION_JSON)
   @RolesAllowed({AuthzRole.ADMIN, AuthzRole.ADMIN_REMOTE})
-  public Response getLibraries(
-      @QueryParam("repoUrl") String repoUrl,
-      @QueryParam("installedOnly") boolean installedOnly
-  ) {
-    return Response.ok()
-        .type(MediaType.APPLICATION_JSON)
-        .entity(stageLibrary.getRepositoryManifestList())
-        .header(REPO_URL, repoUrl)
-        .build();
+  public Response getLibraries() {
+    return Response.ok().type(MediaType.APPLICATION_JSON).entity(stageLibrary.getRepositoryManifestList()).build();
+  }
+
+  @GET
+  @Path("/loadedStageLibraries")
+  @ApiOperation(
+      value = "Return list of loaded stage library id and label",
+      response = Object.class,
+      authorizations = @Authorization(value = "basic"),
+      hidden = true
+  )
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed({AuthzRole.ADMIN, AuthzRole.ADMIN_REMOTE})
+  public Response getLoadedStageLibraries() {
+    List<StageLibraryInfoJson> stageLibraryInfoJsonList = stageLibrary.getLoadedStageLibraries()
+        .stream()
+        .map(s -> new StageLibraryInfoJson(s.getName(), s.getLabel()))
+        .collect(Collectors.toList());
+    return Response.ok().type(MediaType.APPLICATION_JSON).entity(stageLibraryInfoJsonList).build();
   }
 
   @POST
@@ -340,16 +350,16 @@ public class StageLibraryResource {
     List<StageLibraryExtrasJson> extrasList = new ArrayList<>();
     List<StageDefinition> stageDefinitions = stageLibrary.getStages();
     Map<String, Boolean> installedLibrariesMap = new HashMap<>();
-    for(StageDefinition stageDefinition: stageDefinitions) {
+    for (StageDefinition stageDefinition: stageDefinitions) {
       if (!installedLibrariesMap.containsKey(stageDefinition.getLibrary()) &&
           (StringUtils.isEmpty(libraryId) || stageDefinition.getLibrary().equals(libraryId))) {
         installedLibrariesMap.put(stageDefinition.getLibrary(), true);
         File stageLibExtraDir = new File(libsExtraDir, stageDefinition.getLibrary());
         if (stageLibExtraDir.exists()) {
           File extraJarsDir = new File(stageLibExtraDir, STAGE_LIB_JARS_DIR);
-          addExtras(extraJarsDir, stageDefinition.getLibrary(), extrasList);
+          addExtras(extraJarsDir, stageDefinition.getLibrary(), extrasList, false);
           File extraEtc = new File(stageLibExtraDir, STAGE_LIB_CONF_DIR);
-          addExtras(extraEtc, stageDefinition.getLibrary(), extrasList);
+          addExtras(extraEtc, stageDefinition.getLibrary(), extrasList, false);
         }
       }
     }
@@ -359,12 +369,21 @@ public class StageLibraryResource {
         .build();
   }
 
-  private void addExtras(File extraJarsDir, String libraryId, List<StageLibraryExtrasJson> extrasList) {
+  private void addExtras(
+      File extraJarsDir,
+      String libraryId,
+      List<StageLibraryExtrasJson> extrasList,
+      boolean nested
+  ) {
     if (extraJarsDir != null && extraJarsDir.exists()) {
       File[] files = extraJarsDir.listFiles();
       if (files != null ) {
-        for( File f : files){
-          extrasList.add(new StageLibraryExtrasJson(f.getAbsolutePath(), libraryId, f.getName()));
+        for ( File f : files) {
+          if (f.isDirectory() && nested) {
+            addExtras(f, libraryId, extrasList, nested);
+          } else if (!EMPTY_FILE.equals(f.getName())) {
+            extrasList.add(new StageLibraryExtrasJson(f.getAbsolutePath(), libraryId, f.getName()));
+          }
         }
       }
     }
@@ -424,6 +443,127 @@ public class StageLibraryResource {
           extrasJson.getLibraryId() + "/" + STAGE_LIB_JARS_DIR, extrasJson.getFileName());
       if (additionalLibraryFile.exists()) {
         FileUtils.forceDelete(additionalLibraryFile);
+      }
+    }
+    return Response.ok().build();
+  }
+
+  @GET
+  @Path("/externalResources/download")
+  @ApiOperation(
+      value = "Download the external resources directory",
+      response = Object.class,
+      authorizations = @Authorization(value = "basic")
+  )
+  @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  @RolesAllowed({AuthzRole.ADMIN, AuthzRole.ADMIN_REMOTE})
+  public Response downloadExternalLibraries() throws IOException, RestException {
+    if (StringUtils.isEmpty(runtimeInfo.getLibsExtraDir())) {
+      throw new RestException(RestErrors.REST_1004);
+    }
+    File externalResourcesDir = new File(runtimeInfo.getExternalResourcesDir());
+    String stagingDir = Files.createTempDirectory("externalResources").toFile().getAbsolutePath();
+    File resourcesTarGz = new File(stagingDir, "externalResources.tar.gz");
+    TarFileCreator.createTarGz(externalResourcesDir, resourcesTarGz);
+    StreamingOutput streamingOutput = output -> {
+      byte[] data = Files.readAllBytes(resourcesTarGz.toPath());
+      output.write(data);
+      output.flush();
+    };
+    return Response.ok(streamingOutput)
+        .header("Content-Disposition", "attachment; filename=\"externalResources.tar.gz\"")
+        .build();
+  }
+
+  @GET
+  @Path("/userStageLibraries/list")
+  @ApiOperation(
+      value = "Return list of user stage libraries information",
+      response = Object.class,
+      authorizations = @Authorization(value = "basic")
+  )
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed({AuthzRole.ADMIN, AuthzRole.ADMIN_REMOTE})
+  public Response getUserStageLibrariesNames() {
+    List<StageLibraryExtrasJson> extrasList = new ArrayList<>();
+    File userLibsDir = new File(runtimeInfo.getUserLibsDir());
+    if (userLibsDir.exists()) {
+      addExtras(userLibsDir, null, extrasList, false);
+    }
+    return Response.ok()
+        .type(MediaType.APPLICATION_JSON)
+        .entity(extrasList)
+        .build();
+  }
+
+  @GET
+  @Path("/resources/list")
+  @ApiOperation(
+      value = "Return list of resource files",
+      response = Object.class,
+      authorizations = @Authorization(value = "basic")
+  )
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed({AuthzRole.ADMIN, AuthzRole.ADMIN_REMOTE})
+  public Response getResourcesFileNames() {
+    List<StageLibraryExtrasJson> extrasList = new ArrayList<>();
+    File resourcesDir = new File(runtimeInfo.getResourcesDir());
+    if (resourcesDir.exists()) {
+      addExtras(resourcesDir, null, extrasList, true);
+    }
+    return Response.ok()
+        .type(MediaType.APPLICATION_JSON)
+        .entity(extrasList)
+        .build();
+  }
+
+  @POST
+  @Path("/resources/upload")
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
+  @ApiOperation(
+      value = "Upload resources",
+      response = Object.class,
+      authorizations = @Authorization(value = "basic")
+  )
+  @RolesAllowed({AuthzRole.ADMIN, AuthzRole.ADMIN_REMOTE})
+  public Response uploadResourcesFile(
+      @FormDataParam("file") InputStream uploadedInputStream,
+      @FormDataParam("file") FormDataContentDisposition fileDetail
+  ) throws IOException, RestException {
+    String resourcesDir = runtimeInfo.getResourcesDir();
+    if (StringUtils.isEmpty(resourcesDir)) {
+      throw new RestException(RestErrors.REST_1004);
+    }
+    File resourceFile = new File(resourcesDir, fileDetail.getFileName());
+    File parent = resourceFile.getParentFile();
+    if (!parent.exists()) {
+      if (!parent.mkdirs()) {
+        throw new RestException(RestErrors.REST_1003, parent.getName());
+      }
+    }
+    saveFile(uploadedInputStream, resourceFile);
+    return Response.ok().build();
+  }
+
+  @POST
+  @Path("/resources/delete")
+  @ApiOperation(
+      value = "Delete resources file",
+      response = Object.class,
+      authorizations = @Authorization(value = "basic")
+  )
+  @RolesAllowed({AuthzRole.ADMIN, AuthzRole.ADMIN_REMOTE})
+  public Response deleteResourcesFile(
+      List<StageLibraryExtrasJson> extrasList
+  ) throws IOException, RestException {
+    String resourcesDir = runtimeInfo.getResourcesDir();
+    if (StringUtils.isEmpty(resourcesDir)) {
+      throw new RestException(RestErrors.REST_1004);
+    }
+    for (StageLibraryExtrasJson extrasJson : extrasList) {
+      File resourceFile = new File(resourcesDir, extrasJson.getFileName());
+      if (resourceFile.exists()) {
+        FileUtils.forceDelete(resourceFile);
       }
     }
     return Response.ok().build();
