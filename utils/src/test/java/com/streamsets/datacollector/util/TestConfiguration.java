@@ -221,6 +221,51 @@ public class TestConfiguration {
     Assert.assertFalse(stringWriter.toString().contains("secret\nfoo\n"));
   }
 
+  @Test
+  public void testFileRefsUsingResources() throws IOException {
+    File configDir = new File("target", UUID.randomUUID().toString());
+    Assert.assertTrue(configDir.mkdirs());
+    Configuration.setFileRefsBaseDir(configDir);
+
+    File resourcesDir = new File("target", UUID.randomUUID().toString());
+    Assert.assertTrue(resourcesDir.mkdirs());
+    Configuration.setFileRefsResourcesDir(resourcesDir);
+
+    Writer writer = new FileWriter(new File(resourcesDir, "hello.txt"));
+    IOUtils.write("secret\nfoo\n", writer);
+    writer.close();
+    Configuration conf = new Configuration();
+
+    conf.set("a", "@hello.txt@");
+    Assert.assertEquals("secret\nfoo\n", conf.get("a", null));
+
+    conf.set("aa", "${file(\"hello.txt\")}");
+    Assert.assertEquals("secret\nfoo\n", conf.get("aa", null));
+
+    conf.set("aaa", "${file('hello.txt')}");
+    Assert.assertEquals("secret\nfoo\n", conf.get("aaa", null));
+
+    writer = new FileWriter(new File(resourcesDir, "config.properties"));
+    conf.save(writer);
+    writer.close();
+
+    conf = new Configuration();
+    Reader reader = new FileReader(new File(resourcesDir, "config.properties"));
+    conf.load(reader);
+    reader.close();
+
+    Assert.assertEquals("secret\nfoo\n", conf.get("a", null));
+
+    reader = new FileReader(new File(resourcesDir, "config.properties"));
+    StringWriter stringWriter = new StringWriter();
+    IOUtils.copy(reader, stringWriter);
+    reader.close();
+    Assert.assertTrue(stringWriter.toString().contains("@hello.txt@"));
+    Assert.assertTrue(stringWriter.toString().contains("${file(\"hello.txt\")}"));
+    Assert.assertTrue(stringWriter.toString().contains("${file('hello.txt')}"));
+    Assert.assertFalse(stringWriter.toString().contains("secret\nfoo\n"));
+  }
+
   @Test(expected = RuntimeException.class)
   public void testFileRefsNotConfigured() throws IOException {
     Configuration.setFileRefsBaseDir(null);
@@ -311,6 +356,39 @@ public class TestConfiguration {
 
     Configuration conf = new Configuration();
     Reader reader = new FileReader(new File(dir, "config.properties"));
+    conf.load(reader);
+    reader.close();
+
+    Assert.assertEquals("A", conf.get("a", null));
+    Assert.assertEquals("B", conf.get("b", null));
+    Assert.assertEquals("C", conf.get("c", null));
+    Assert.assertNull(conf.get(Configuration.CONFIG_INCLUDES, null));
+  }
+
+  @Test
+  public void testIncludesUsingResourcesFolder() throws Exception {
+    File configDir = new File("target", UUID.randomUUID().toString());
+    Assert.assertTrue(configDir.mkdirs());
+    Configuration.setFileRefsBaseDir(configDir);
+
+    File resourcesDir = new File("target", UUID.randomUUID().toString());
+    Assert.assertTrue(resourcesDir.mkdirs());
+    Configuration.setFileRefsResourcesDir(resourcesDir);
+
+    Writer writer = new FileWriter(new File(configDir, "config.properties"));
+    IOUtils.write("a=A\nconfig.includes=include1.properties , ", writer);
+    writer.close();
+
+    writer = new FileWriter(new File(resourcesDir, "include1.properties"));
+    IOUtils.write("b=B\nconfig.includes=include2.properties , ", writer);
+    writer.close();
+
+    writer = new FileWriter(new File(configDir, "include2.properties"));
+    IOUtils.write("c=C\n", writer);
+    writer.close();
+
+    Configuration conf = new Configuration();
+    Reader reader = new FileReader(new File(configDir, "config.properties"));
     conf.load(reader);
     reader.close();
 

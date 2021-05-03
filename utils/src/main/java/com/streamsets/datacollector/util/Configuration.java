@@ -38,6 +38,7 @@ import java.util.regex.Pattern;
 
 public class Configuration implements com.streamsets.pipeline.api.Configuration {
   private static File fileRefsBaseDir;
+  private static File fileRefsResourcesDir;
 
   private static final String SENSITIVE_PROPERTIES = "sensitive.properties";
   private static final String SENSITIVE_PROPERTIES_DEFAULT = ".*password.*";
@@ -46,6 +47,11 @@ public class Configuration implements com.streamsets.pipeline.api.Configuration 
   // Only RuntimeModules should be calling this
   public static void setFileRefsBaseDir(File dir) {
     fileRefsBaseDir = dir;
+  }
+
+  // Only RuntimeModules should be calling this
+  public static void setFileRefsResourcesDir(File dir) {
+    fileRefsResourcesDir = dir;
   }
 
   public File getFilRefsBaseDir() {
@@ -183,11 +189,7 @@ public class Configuration implements com.streamsets.pipeline.api.Configuration 
       StringBuilder sb = new StringBuilder();
       File configFile;
       String configFileName = getUnresolvedValueWithoutDelimiter();
-      if (Paths.get(configFileName).isAbsolute()) {
-        configFile = new File(configFileName);
-      } else {
-        configFile = new File(fileRefsBaseDir, configFileName);
-      }
+      configFile = getConfigFile(configFileName);
       try (Reader reader = new FileReader(configFile)) {
         int c = reader.read();
         while (c > -1) {
@@ -236,13 +238,8 @@ public class Configuration implements com.streamsets.pipeline.api.Configuration 
 
     @Override
     public String getValue() {
-      File script;
       String configFileName = getUnresolvedValueWithoutDelimiter();
-      if (Paths.get(configFileName).isAbsolute()) {
-        script = new File(configFileName);
-      } else {
-        script = new File(fileRefsBaseDir, configFileName);
-      }
+      File script = getConfigFile(configFileName);
       if (script.exists()) {
         if (script.canExecute()) {
           StringBuilder sb = new StringBuilder();
@@ -489,7 +486,7 @@ public class Configuration implements com.streamsets.pipeline.api.Configuration 
     if (includes != null) {
       map.remove(CONFIG_INCLUDES);
       for (String include : Splitter.on(",").trimResults().omitEmptyStrings().split(includes)) {
-        File file = new File(fileRefsBaseDir, include);
+        File file = getConfigFile(include);
         try (Reader reader = new FileReader(file)) {
           Configuration conf = new Configuration();
           conf.load(reader);
@@ -534,6 +531,26 @@ public class Configuration implements com.streamsets.pipeline.api.Configuration 
       } else {
         this.set(entry.getKey(), entry.getValue());
       }
+    }
+  }
+
+  /**
+   * First, check if the config file name is absolute.
+   * Second, check the config file inside the config directory (etc., folder).
+   * If it doesn't exist, look for the file inside the resources folder.
+   *
+   * @param configFileName Config File Name
+   * @return resolved File
+   */
+  static File getConfigFile(String configFileName) {
+    if (Paths.get(configFileName).isAbsolute()) {
+      return new File(configFileName);
+    } else {
+      File configFile = new File(fileRefsBaseDir, configFileName);
+      if (!configFile.exists() && fileRefsResourcesDir != null) {
+        configFile = new File(fileRefsResourcesDir, configFileName);
+      }
+      return configFile;
     }
   }
 }

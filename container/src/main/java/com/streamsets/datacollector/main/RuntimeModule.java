@@ -101,6 +101,7 @@ public class RuntimeModule {
   @Provides @Singleton
   public Configuration provideConfiguration(RuntimeInfo runtimeInfo) {
     Configuration.setFileRefsBaseDir(new File(runtimeInfo.getConfigDir()));
+    Configuration.setFileRefsResourcesDir(new File(runtimeInfo.getResourcesDir()));
     Configuration conf = new Configuration();
     RuntimeInfo.loadOrReloadConfigs(runtimeInfo, conf);
 
