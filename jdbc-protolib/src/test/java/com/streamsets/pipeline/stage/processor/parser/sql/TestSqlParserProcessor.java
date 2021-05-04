@@ -108,7 +108,7 @@ public class TestSqlParserProcessor {
     Record r = RecordCreator.create();
     Map<String, Field> fields = new HashMap<>();
     fields.put("sql", Field.create("INSERT INTO \"SYS\".\"TEST\"(\"ID\", \"DT\", \"DEC\") " +
-        "VALUES ('10', TO_DATE('2016-11-21 11:34:09', 'YYYY-MM-DD HH24:MI:SS'), '1000.3300'"));
+        "VALUES ('10', TO_DATE('2016-11-21 11:34:09', 'YYYY-MM-DD HH24:MI:SS'), '1000.3300')"));
     r.set(Field.create(fields));
     SqlParserProcessor processor = new SqlParserProcessor(config);
     ResultSetMetaData rsmd = setupMocks("\"SYS\".\"TEST\"", processor);

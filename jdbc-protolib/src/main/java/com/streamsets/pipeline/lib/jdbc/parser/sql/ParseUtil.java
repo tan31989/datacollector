@@ -66,6 +66,8 @@ public final class ParseUtil {
     plsqlLexer lexer = new plsqlLexer(new ANTLRInputStream(queryString));
     CommonTokenStream tokenStream = new CommonTokenStream(lexer);
     plsqlParser parser = new plsqlParser(tokenStream);
+    parser.removeErrorListeners();
+    parser.addErrorListener(new SqlParserErrorListener());
     ParserRuleContext context = null;
     switch (op) {
       case OracleCDCOperationCode.UPDATE_CODE:

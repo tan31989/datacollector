@@ -18,6 +18,7 @@ package com.streamsets.pipeline.lib.jdbc.parser.sql;
 import com.google.common.annotations.VisibleForTesting;
 import com.streamsets.pipeline.api.StageException;
 import com.streamsets.pipeline.lib.jdbc.JdbcErrors;
+import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import plsql.plsqlBaseListener;
 import plsql.plsqlParser;
@@ -254,5 +255,40 @@ public class SQLListener extends plsqlBaseListener {
 
   public void setColumns(Set<String> columns) {
     this.columnsExpected = columns;
+  }
+
+  @Override
+  public void visitErrorNode(ErrorNode node) {
+    throw new SQLParseException("visit error node", node.toString());
+  }
+
+  @Override
+  public void enterError_logging_clause(plsqlParser.Error_logging_clauseContext ctx) {
+    throw new SQLParseException("enter clause", ctx.toString());
+  }
+
+  @Override
+  public void exitError_logging_clause(plsqlParser.Error_logging_clauseContext ctx) {
+    throw new SQLParseException("exit clause", ctx.toString());
+  }
+
+  @Override
+  public void enterError_logging_into_part(plsqlParser.Error_logging_into_partContext ctx) {
+    throw new SQLParseException("enter part", ctx.toString());
+  }
+
+  @Override
+  public void exitError_logging_into_part(plsqlParser.Error_logging_into_partContext ctx) {
+    throw new SQLParseException("exit part", ctx.toString());
+  }
+
+  @Override
+  public void enterError_logging_reject_part(plsqlParser.Error_logging_reject_partContext ctx) {
+    throw new SQLParseException("enter reject part", ctx.toString());
+  }
+
+  @Override
+  public void exitError_logging_reject_part(plsqlParser.Error_logging_reject_partContext ctx) {
+    throw new SQLParseException("exit reject part", ctx.toString());
   }
 }

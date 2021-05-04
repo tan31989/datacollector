@@ -32,6 +32,7 @@ import com.streamsets.pipeline.lib.jdbc.UtilsProvider;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.DateTimeColumnHandler;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.ParseUtil;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.SQLListener;
+import com.streamsets.pipeline.lib.jdbc.parser.sql.SQLParseException;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.UnparseableSQLException;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.UnsupportedFieldTypeException;
 import com.streamsets.pipeline.lib.operation.OperationType;
@@ -219,6 +220,8 @@ public class SqlParserProcessor extends SingleLaneProcessor {
     } catch (UnparseableSQLException ex) {
       errorRecordHandler.onError(new OnRecordErrorException(record, JDBC_403, sql));
       return Optional.empty(); // Record has been sent to error, so don't return it.
+    } catch (SQLParseException eSQLParseException) {
+      throw new StageException(JdbcErrors.JDBC_96, sql, eSQLParseException.origin, eSQLParseException.reason);
     }
   }
 

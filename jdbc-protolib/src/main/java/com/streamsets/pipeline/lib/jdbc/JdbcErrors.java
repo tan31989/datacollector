@@ -121,6 +121,8 @@ public enum JdbcErrors implements ErrorCode {
   JDBC_94("SQL Query parsing not supported for 'SELECT FOR UPDATE' statements. " +
     "Please remove 'SELECT FOR UPDATE' or disable the 'Parse SQL Query' config."),
   JDBC_95("Column Name '{}' from the Columns Mappings configuration not found in the database."),
+  JDBC_96("Error parsing [{}] statement. Generic error triggered by '{}'. Additional info: {}"),
+
 
   JDBC_100("Could not enable partitioning for table {}: {}"),
   JDBC_101("Invalid partition size for table {}: {}"),
