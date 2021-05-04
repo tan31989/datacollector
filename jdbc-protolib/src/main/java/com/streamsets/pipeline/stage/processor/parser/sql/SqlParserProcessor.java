@@ -109,6 +109,9 @@ public class SqlParserProcessor extends SingleLaneProcessor {
   SqlParserProcessor(SqlParserConfigBean configBean) {
     this.configBean = configBean;
     this.listener = new SQLListener();
+    if (configBean.caseSensitive) {
+      listener.setCaseSensitive();
+    }
     this.jdbcUtil = UtilsProvider.getJdbcUtil();
   }
 
