@@ -15,6 +15,7 @@
  */
 package com.streamsets.datacollector.task;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.streamsets.pipeline.api.impl.Utils;
 import com.streamsets.pipeline.lib.util.ThreadUtil;
@@ -22,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class CompositeTask extends AbstractTask {
@@ -91,6 +93,11 @@ public class CompositeTask extends AbstractTask {
     for (Task subTask : subTasks) {
       subTask.waitWhileRunning();
     }
+  }
+
+  @VisibleForTesting
+  public List<Task> getSubTasks() {
+    return Collections.unmodifiableList(subTasks);
   }
 
   @Override

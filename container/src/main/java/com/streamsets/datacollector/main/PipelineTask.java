@@ -61,6 +61,8 @@ public class PipelineTask extends CompositeTask {
     AntennaDoctor antennaDoctor,
     EntitlementSyncTask entitlementSyncTask
   ) {
+    // The tasks in list are started in order from first element, and stopped in reverse order.
+    // Be careful in changing position of tasks in the list.
     super(
       "pipelineNode",
         ImmutableList.of(
@@ -70,8 +72,8 @@ public class PipelineTask extends CompositeTask {
             blobStoreTask,
             store,
             webServerTask,
-            manager,
             eventHandlerTask,
+            manager,
             supportBundleManager,
             statsCollectorTask,
             antennaDoctor,
