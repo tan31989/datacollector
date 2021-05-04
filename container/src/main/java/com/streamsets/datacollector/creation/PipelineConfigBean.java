@@ -614,7 +614,7 @@ public class PipelineConfigBean implements Stage {
               triggeredByValues = ConnectionDef.Constants.CONNECTION_SELECT_MANUAL
           )
       },
-      groups = {PipelineGroups.EMR_GROUP_NAME, PipelineGroups.BOOTSTRAP_ACTIONS_NAME}
+      groups = {PipelineGroups.EMR_GROUP_NAME}
   )
   public EMRClusterConnection sdcEmrConnection;
 
@@ -661,7 +661,7 @@ public class PipelineConfigBean implements Stage {
               triggeredByValues = ConnectionDef.Constants.CONNECTION_SELECT_MANUAL
           )
       },
-      groups = {PipelineGroups.CLUSTER_GROUP_NAME, PipelineGroups.BOOTSTRAP_ACTIONS_NAME}
+      groups = {PipelineGroups.CLUSTER_GROUP_NAME}
   )
   public EMRClusterConnection transformerEmrConnection;
 

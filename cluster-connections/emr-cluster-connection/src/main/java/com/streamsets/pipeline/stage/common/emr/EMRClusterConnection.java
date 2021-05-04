@@ -128,7 +128,7 @@ public class EMRClusterConnection {
       description = "Defines where bootstrap action should be taken from",
       displayPosition = 2110,
       displayMode = ConfigDef.DisplayMode.BASIC,
-      group = "#1",
+      group = "#0",
       dependsOn = "defineBootstrapActions",
       triggeredByValue = "true"
   )
@@ -140,13 +140,11 @@ public class EMRClusterConnection {
       label = "Bootstrap Actions",
       description = "S3 URIs of bootstrap actions and their arguments",
       type = ConfigDef.Type.MODEL,
+      defaultValue = "[]",
       displayPosition = 2120,
-      group = "#1",
-      dependencies = {
-          @Dependency(configName = "provisionNewCluster", triggeredByValues = "true"),
-          @Dependency(configName = "defineBootstrapActions", triggeredByValues = "true"),
-          @Dependency(configName = "bootstrapActionSource", triggeredByValues = "IN_S3")
-      }
+      group = "#0",
+      dependsOn = "bootstrapActionSource",
+      triggeredByValue = "IN_S3"
   )
   @ListBeanModel
   public List<BootstrapAction> bootstrapActions = new ArrayList<>();
@@ -155,16 +153,13 @@ public class EMRClusterConnection {
       required = true,
       label = "Bootstrap Action Scripts",
       description = "Contents of bootstrap actions",
-      type = ConfigDef.Type.MODEL,
+      type = ConfigDef.Type.LIST,
+      defaultValue = "[]",
       displayPosition = 2130,
-      group = "#1",
-      dependencies = {
-          @Dependency(configName = "provisionNewCluster", triggeredByValues = "true"),
-          @Dependency(configName = "defineBootstrapActions", triggeredByValues = "true"),
-          @Dependency(configName = "bootstrapActionSource", triggeredByValues = "IN_PIPELINE")
-      }
+      group = "#0",
+      dependsOn = "bootstrapActionSource",
+      triggeredByValue = "IN_PIPELINE"
   )
-  @ListBeanModel
   public List<BootstrapActionScript> bootstrapActionScripts = new ArrayList<>();
 
   @ConfigDef(
