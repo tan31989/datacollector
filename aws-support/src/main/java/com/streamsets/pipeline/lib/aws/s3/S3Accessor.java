@@ -206,6 +206,7 @@ public class S3Accessor implements Closeable {
   ClientConfiguration createClientConfiguration() {
     ClientConfiguration clientConfig = new ClientConfiguration();
 
+    clientConfig.setUseTcpKeepAlive(true);
     clientConfig.setConnectionTimeout(connectionConfigs.getConnectionTimeoutMillis());
     clientConfig.setSocketTimeout(connectionConfigs.getSocketTimeoutMillis());
     clientConfig.withMaxErrorRetry(connectionConfigs.getMaxErrorRetry());

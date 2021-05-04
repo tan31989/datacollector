@@ -119,6 +119,7 @@ public class AWSUtil {
   public static ClientConfiguration getClientConfiguration(ProxyConfig config) {
     ClientConfiguration clientConfig = new ClientConfiguration();
 
+    clientConfig.setUseTcpKeepAlive(true);
     clientConfig.setConnectionTimeout(config.connectionTimeout * MILLIS);
     clientConfig.setSocketTimeout(config.socketTimeout * MILLIS);
     clientConfig.withMaxErrorRetry(config.retryCount);
