@@ -444,60 +444,22 @@ then
   EXTRA_OPTIONS="-streamsetsLibrariesExtraDir ${STREAMSETS_LIBRARIES_EXTRA_DIR}"
 fi
 
-check_curl_and_tar_installed() {
-  if [[ ! -x "$(which curl)" ]] && [[ ! -x "$(which tar)" ]] ; then
-    reportEvent "ERROR" "STARTUP" "S04" "Curl and Tar commands are needed to run Deployment Bootstrap"
-    exit -1
-  fi
-}
-
-run_bootstrap() {
-  STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR=${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR:=${SDC_DIST}}
-
-  if [[ ! -z "${STREAMSETS_DEPLOYMENT_SCH_URL}" ]] && [[ ! -z "${STREAMSETS_DEPLOYMENT_ID}" ]] && [[ ! -z "${STREAMSETS_DEPLOYMENT_TOKEN}" ]]; then
-    # Perform Download Operation
-    downloadWithChecksumVerification "BOOTSTRAP" "${STREAMSETS_DEPLOYMENT_SCH_URL}/engineBootstrap/bootstrap.tgz" "${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/bootstrap.tgz"
-
-    # Delete old deployment lib
-    run rm -rf ${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/deployment-lib
-    if [[ ${RET} -ne 0 ]]; then
-      MESSAGE="Could not delete '${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/deployment-lib' directory, ${ERR}"
-      reportEvent "ERROR" "BOOTSTRAP" "B01" "${MESSAGE}"
-      exit 1
-    fi
-
-    run tar xzf ${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/bootstrap.tgz --directory ${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}
-    if [[ ${RET} -ne 0 ]]; then
-      MESSAGE="Extracting tarball binary '${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/bootstrap.tgz', ${ERR}"
-      reportEvent "ERROR" "BOOTSTRAP" "B02" "${MESSAGE}"
-      exit 1
-    fi
-
-    reportEvent "INFO" "BOOTSTRAP" "B03" "Starting Bootstrap"
-
-    STREAMSETS_BOOTSTRAP_MAIN_CLASS="com.streamsets.engine.deployment.bootstrap.DeploymentBootstrapMain"
-    STREAMSETS_BOOTSTRAP_JAVA_OPTS="-Dstreamsets.deployment.conf.dir=${SDC_CONF} -Dstreamsets.deployment.data.dir=${SDC_DATA} -Dstreamsets.deployment.stage.lib.dir=${STREAMSETS_LIBRARIES_DIR} ${STREAMSETS_BOOTSTRAP_JAVA_OPTS}"
-    run ${JAVA} ${STREAMSETS_BOOTSTRAP_JAVA_OPTS} -classpath "${STREAMSETS_DEPLOYMENT_LIB_EXTRACT_DIR}/deployment-lib/lib/*" ${STREAMSETS_BOOTSTRAP_MAIN_CLASS}
-
-    if [[ ${RET} -ne 0 ]]; then
-      MESSAGE="Bootstrap error, ${ERR}"
-      reportEvent "ERROR" "BOOTSTRAP" "B04" "${MESSAGE}"
-      exit 1
-    fi
-
-    if [[ -f ${SDC_CONF}/deployment-java-opts.txt ]]; then
-      DEPLOYMENT_JAVA_OPTS=$(cat ${SDC_CONF}/deployment-java-opts.txt)
-      if [[ ! -z ${DEPLOYMENT_JAVA_OPTS} ]]; then
-        # Append Java options from the deployment it exists
-        SDC_JAVA_OPTS="${SDC_JAVA_OPTS} ${DEPLOYMENT_JAVA_OPTS}"
-      fi
-    fi
-  else
-    echo "Deployment Bootstrap Not triggered"
-  fi
-}
-
 run_sdc() {
+  if [[ ${DEPLOYMENT_RUN} -eq 1 ]]; then
+    # Create envs to pass down to the pre start logic (as it will run as a child process)
+    ENV_FILE=$(mktemp)
+    # We are selectively picking only needed ENVs to pass down the pre start logic
+    set | grep -iE "^(JAVA|STREAMSETS|SDC|DATACOLLECTOR)" > "${ENV_FILE}"
+    run_engine_pre_start "${ENV_FILE}"
+    # Pre start logic can create ".newenv" file for main engine process to source
+    ENV_FILE_NEW="{ENV_FILE}.newenv"
+    if [[ -f "${ENV_FILE_NEW}" ]]; then
+      source "${ENV_FILE_NEW}"
+      rm -rf "${ENV_FILE_NEW}"
+    else
+      echo "No Env file to source"
+    fi
+  fi
   reportEvent "INFO" "EXECUTION" "E01" "Starting engine"
   ${JAVA} -classpath ${BOOTSTRAP_CLASSPATH} ${SDC_JAVA_OPTS} com.streamsets.pipeline.BootstrapMain \
     -mainClass ${SDC_MAIN_CLASS} -apiClasspath "${API_CLASSPATH}" -containerClasspath "${CONTAINER_CLASSPATH}" \
@@ -520,6 +482,18 @@ run_sdc() {
     reportEvent "INFO" "EXECUTION" "E03" "Restarting Engine"
   else
     reportEvent "ERROR" "EXECUTION" "E04" "Exit: ${RET} STDOUT: ${OUT}"
+  fi
+
+  if [[ ${DEPLOYMENT_RUN} -eq 1 ]]; then
+    # Create envs to pass down to the pre start logic (as it will run as a child process)
+    ENV_FILE=$(mktemp)
+    # We are selectively picking only needed ENVs to pass down the pre start logic
+    set | grep -iE "^(JAVA|STREAMSETS|SDC|DATACOLLECTOR)" > "${ENV_FILE}"
+    run_engine_post_stop "${ENV_FILE}" "${RET}"
+    rm -rf "${ENV_FILE}"
+  fi
+
+  if [[ ${RET} -ne 0 ]] && [[ ${RET} -ne 88 ]]; then
     echo "Exit: ${RET}"
     exit ${RET}
   fi
