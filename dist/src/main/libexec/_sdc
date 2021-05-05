@@ -516,9 +516,6 @@ if [ $EXEC -eq 1 ]; then
   fi
 else
   while true; do
-    if [[ ${DEPLOYMENT_RUN} -eq 1 ]]; then
-      run_bootstrap
-    fi
     run_sdc
     status=${RET}
   done
