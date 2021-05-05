@@ -42,3 +42,9 @@ upgrades:
       - renameConfig:
           oldNamePattern: hikariConf.password
           newNamePattern: hikariConf.connection.password
+  - toVersion: 15
+    actions:
+      - setConfig:
+            name: oracleCDCConfigBean.putPseudocolumnsInHeader
+            value: false
+

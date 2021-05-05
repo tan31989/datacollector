@@ -166,6 +166,7 @@ public class OracleCDCSource extends BaseSource {
   private static final String PRECISION_TIMESTAMP = PREFIX + "precisionTimestamp";
   private static final String ORACLE_SEQUENCE = PREFIX + "sequence.oracle";
   private static final String INTERNAL_SEQUENCE = PREFIX + "sequence.internal";
+  private static final String ORACLE_PSEUDOCOLUMNS = PREFIX + "oracle.pseudocolumn.";
   private static final String QUERY_KEY = PREFIX + "query";
   private static final String NULL = "NULL";
   private static final String OFFSET_VERSION_STR = "v2";
@@ -1100,13 +1101,34 @@ public class OracleCDCSource extends BaseSource {
         }
       }
 
-      String rowId = columns.get(ROWID);
-      columns.remove(ROWID);
-      if (rowId != null) {
-        attributes.put(ROWID_KEY, rowId);
+      Map<String, String> pseudocolumns = SQLParserUtils.filterPseudocolumns(columns);
+      if (configBean.putPseudocolumnsInHeader) {
+        for (Map.Entry<String, String> pseudocolumn : pseudocolumns.entrySet()) {
+          attributes.put(ORACLE_PSEUDOCOLUMNS + pseudocolumn.getKey(), pseudocolumn.getValue());
+          if (pseudocolumn.getKey().equalsIgnoreCase(Pseudocolumn.ROWID.getName())) {
+            attributes.put(ROWID_KEY, pseudocolumn.getValue());
+          }
+          columns.remove(pseudocolumn.getKey());
+        }
       }
-      Map<String, Field> fields = new HashMap<>();
+      else {
+        /* This code block is necessary for backward compatibility */
+        String pseudocolumnValue = pseudocolumns.get(Pseudocolumn.ROWID.getName());
+        if (pseudocolumnValue != null) {
+          attributes.put(ROWID_KEY, pseudocolumnValue);
+          columns.remove(Pseudocolumn.ROWID.getName());
+        } else {
+          for (Map.Entry<String, String> pseudocolumn : pseudocolumns.entrySet()) {
+            if (pseudocolumn.getKey().equalsIgnoreCase(Pseudocolumn.ROWID.getName())) {
+              attributes.put(ROWID_KEY, pseudocolumn.getValue());
+              columns.remove(pseudocolumn.getKey());
+              break;
+            }
+          }
+        }
+      }
 
+      Map<String, Field> fields = new HashMap<>();
       List<UnsupportedFieldTypeException> fieldTypeExceptions = new ArrayList<>();
       for (Map.Entry<String, String> column : columns.entrySet()) {
         String columnName = column.getKey();

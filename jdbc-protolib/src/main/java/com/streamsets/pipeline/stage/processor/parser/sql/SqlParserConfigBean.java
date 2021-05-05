@@ -52,10 +52,23 @@ public class SqlParserConfigBean {
   @ConfigDef(
       required = true,
       type = ConfigDef.Type.BOOLEAN,
+      label = "Pseudocolumns in Header",
+      description = "Remove pseudocolumns from parsed redolog and place them in pseudocolumns header attributes. " +
+      "Use only when parsing Oracle statements.",
+      displayPosition = 24,
+      group = "PARSE",
+      defaultValue = "false"
+  )
+
+  public boolean putPseudocolumnsInHeader;
+
+  @ConfigDef(
+      required = true,
+      type = ConfigDef.Type.BOOLEAN,
       label = "Resolve Schema from DB",
       description = "Connect to the DB to resolve the schema. Automatically resolves fields to the correct supported " +
           "types",
-      displayPosition = 20,
+      displayPosition = 26,
       group = "PARSE"
   )
   public boolean resolveSchema;

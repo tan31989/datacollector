@@ -17,6 +17,7 @@ package com.streamsets.pipeline.lib.jdbc.parser.sql;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.streamsets.pipeline.lib.jdbc.OracleCDCOperationCode;
+import com.streamsets.pipeline.stage.origin.jdbc.cdc.oracle.Pseudocolumn;
 import org.apache.commons.lang3.StringUtils;
 import org.parboiled.Node;
 import org.parboiled.Rule;
@@ -144,4 +145,23 @@ public class SQLParserUtils {
     return columnName.substring(stripCount, columnName.length() - stripCount);
   }
 
+  public static Map<String, String> filterPseudocolumns(Map<String, String> columns) {
+    Map<String, String> pseudocolumns = new HashMap<>();
+
+    Map<String, Map<String, String>> lowerCaseColumns = new HashMap<>();
+    String lowerCaseColumnKey;
+    for (Map.Entry<String, String> column : columns.entrySet()) {
+      lowerCaseColumnKey = column.getKey().toLowerCase();
+      lowerCaseColumns.computeIfAbsent(lowerCaseColumnKey, key -> new HashMap<>()).put(column.getKey(), column.getValue());
+    }
+
+    Map<String, String> column;
+    for (Pseudocolumn pseudocolumn : Pseudocolumn.values()) {
+      column = lowerCaseColumns.get(pseudocolumn.getName());
+      if (column != null) {
+        pseudocolumns.putAll(column);
+      }
+    }
+    return pseudocolumns;
+  }
 }

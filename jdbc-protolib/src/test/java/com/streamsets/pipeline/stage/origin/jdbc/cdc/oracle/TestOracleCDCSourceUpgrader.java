@@ -17,6 +17,7 @@ package com.streamsets.pipeline.stage.origin.jdbc.cdc.oracle;
 
 import com.streamsets.pipeline.api.Config;
 import com.streamsets.pipeline.api.StageUpgrader;
+import com.streamsets.pipeline.config.upgrade.UpgraderTestUtils;
 import com.streamsets.pipeline.lib.jdbc.connection.upgrader.JdbcConnectionUpgradeTestUtil;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.UnsupportedFieldTypeValues;
 import com.streamsets.pipeline.stage.origin.jdbc.cdc.postgres.PostgresCDCSourceUpgrader;
@@ -238,5 +239,17 @@ public class TestOracleCDCSourceUpgrader {
         "hikariConf.",
         "connection."
     );
+  }
+
+  @Test
+  public void upgradeV14TOV15() {
+    StageUpgrader.Context context = Mockito.mock(StageUpgrader.Context.class);
+    Mockito.doReturn(14).when(context).getFromVersion();
+    Mockito.doReturn(15).when(context).getToVersion();
+
+    List<Config> configs = new ArrayList<>();
+    configs = oracleCDCSourceUpgrader.upgrade(configs, context);
+
+    UpgraderTestUtils.assertExists(configs,"oracleCDCConfigBean.putPseudocolumnsInHeader", false);
   }
 }

@@ -213,6 +213,20 @@ public class OracleCDCConfigBean {
   @ConfigDef(
       required = true,
       type = ConfigDef.Type.BOOLEAN,
+      label = "Pseudocolumns in Header",
+      description = "Remove pseudocolumns from parsed redolog and place them in pseudocolumns header attributes. " +
+          "ROWID will always be removed and (additionally) inserted into field /ROWID",
+      displayPosition = 160,
+      group = "CDC",
+      dependsOn = "parseQuery",
+      triggeredByValue = "true",
+      defaultValue = "false"
+  )
+  public boolean putPseudocolumnsInHeader;
+
+  @ConfigDef(
+      required = true,
+      type = ConfigDef.Type.BOOLEAN,
       label = "Send Redo Query in Headers",
       description = "Send the actual redo query returned by LogMiner in record headers",
       displayPosition = 170,

@@ -33,6 +33,7 @@ import com.streamsets.pipeline.lib.jdbc.parser.sql.DateTimeColumnHandler;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.ParseUtil;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.SQLListener;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.SQLParseException;
+import com.streamsets.pipeline.lib.jdbc.parser.sql.SQLParserUtils;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.UnparseableSQLException;
 import com.streamsets.pipeline.lib.jdbc.parser.sql.UnsupportedFieldTypeException;
 import com.streamsets.pipeline.lib.operation.OperationType;
@@ -40,6 +41,7 @@ import com.streamsets.pipeline.stage.common.DefaultErrorRecordHandler;
 import com.streamsets.pipeline.stage.common.ErrorRecordHandler;
 import com.streamsets.pipeline.stage.origin.jdbc.cdc.oracle.Groups;
 import com.streamsets.pipeline.stage.origin.jdbc.cdc.SchemaAndTable;
+import com.streamsets.pipeline.stage.origin.jdbc.cdc.oracle.Pseudocolumn;
 import com.zaxxer.hikari.HikariDataSource;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
@@ -75,6 +77,7 @@ public class SqlParserProcessor extends SingleLaneProcessor {
   public static final String INSERT = "INSERT";
   public static final String UPDATE = "UPDATE";
   public static final String DELETE = "DELETE";
+  private static final String ORACLE_PSEUDOCOLUMNS = "oracle.pseudocolumn.";
   private static final String UNSUPPORTED_OPERATION = "Unsupported Operation: '{}'";
   private static final String SENDING_TO_ERROR_AS_CONFIGURED = ". Sending to error as configured";
   private static final String UNSUPPORTED_TO_ERR = JDBC_85.getMessage() + SENDING_TO_ERROR_AS_CONFIGURED;
@@ -184,6 +187,15 @@ public class SqlParserProcessor extends SingleLaneProcessor {
         record.getHeader().setAttribute(TABLE_METADATA_TABLE_SCHEMA_CONSTANT, schema);
       }
       Map<String, String> columns = listener.getColumns();
+
+      if (configBean.putPseudocolumnsInHeader) {
+        Map<String, String> pseudocolumns = SQLParserUtils.filterPseudocolumns(columns);
+        for (Map.Entry<String, String> pseudocolumn : pseudocolumns.entrySet()) {
+          record.getHeader().setAttribute(ORACLE_PSEUDOCOLUMNS + pseudocolumn.getKey(), pseudocolumn.getValue());
+          columns.remove(pseudocolumn.getKey());
+        }
+      }
+
       final SchemaAndTable schemaAndTable = new SchemaAndTable(schema, table);
       if (configBean.resolveSchema) {
         if (!tableSchemas.containsKey(schemaAndTable)) {
@@ -291,7 +303,6 @@ public class SqlParserProcessor extends SingleLaneProcessor {
     }
     return true;
   }
-
 
   private void resolveSchema(SchemaAndTable schemaAndTable) throws StageException {
     Map<String, Integer> columns = new HashMap<>();
