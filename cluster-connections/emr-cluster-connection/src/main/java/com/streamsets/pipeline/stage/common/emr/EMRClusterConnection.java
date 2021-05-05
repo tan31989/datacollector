@@ -153,13 +153,14 @@ public class EMRClusterConnection {
       required = true,
       label = "Bootstrap Action Scripts",
       description = "Contents of bootstrap actions",
-      type = ConfigDef.Type.LIST,
+      type = ConfigDef.Type.MODEL,
       defaultValue = "[]",
       displayPosition = 2130,
       group = "#0",
       dependsOn = "bootstrapActionSource",
       triggeredByValue = "IN_PIPELINE"
   )
+  @ListBeanModel
   public List<BootstrapActionScript> bootstrapActionScripts = new ArrayList<>();
 
   @ConfigDef(
