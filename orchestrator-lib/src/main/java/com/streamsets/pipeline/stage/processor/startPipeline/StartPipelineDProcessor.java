@@ -31,6 +31,7 @@ import com.streamsets.pipeline.lib.startPipeline.StartPipelineConfig;
     label = "Start Pipelines",
     description = "Starts pipelines on Data Collector, Edge, or Transformer",
     icon="pipeline.png",
+    beta = true,
     execution = {
         ExecutionMode.STANDALONE
     },
@@ -38,6 +39,7 @@ import com.streamsets.pipeline.lib.startPipeline.StartPipelineConfig;
     upgrader = StartPipelineDProcessorUpgrader.class,
     upgraderDef = "upgrader/StartPipelineDProcessor.yaml"
 )
+@Deprecated
 @GenerateResourceBundle
 @HideConfigs({
     "conf.tlsConfig.useRemoteKeyStore",

@@ -30,12 +30,14 @@ import com.streamsets.pipeline.lib.startPipeline.Groups;
     label = "Wait for Pipelines",
     description = "Waits for pipelines to complete on Data Collector, Edge, or Transformer",
     icon="pipeline.png",
+    beta = true,
     execution = {
         ExecutionMode.STANDALONE
     },
     onlineHelpRefUrl ="index.html?contextID=task_whc_d43_plb",
     upgraderDef = "upgrader/WaitForPipelineCompletionDProcessor.yaml"
 )
+@Deprecated
 @GenerateResourceBundle
 @HideConfigs({
     "conf.tlsConfig.useRemoteKeyStore",
