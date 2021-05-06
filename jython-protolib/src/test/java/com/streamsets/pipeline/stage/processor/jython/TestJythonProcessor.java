@@ -142,12 +142,12 @@ public class TestJythonProcessor {
   }
 
 
-  @Test
+  @Test(expected = StageException.class)
   public void testBatchOnErrorDiscard() throws Exception {
     testBatchModeOnErrorHandling(OnRecordError.DISCARD);
   }
 
-  @Test
+  @Test(expected = StageException.class)
   public void testBatchOnErrorToError() throws Exception {
     testBatchModeOnErrorHandling(OnRecordError.TO_ERROR);
   }

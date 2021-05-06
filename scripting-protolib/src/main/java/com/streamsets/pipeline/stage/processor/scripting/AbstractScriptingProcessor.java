@@ -215,12 +215,7 @@ public abstract class AbstractScriptingProcessor extends SingleLaneProcessor {
           );
           break;
         case BATCH:
-          errorRecordHandler.onError(
-              Errors.SCRIPTING_06,
-              ex.toString(),
-              ex
-          );
-          break;
+          throw new StageException(Errors.SCRIPTING_06, ex.toString(), ex);
         default:
           throw new IllegalStateException(
               Utils.format("Unknown OnError value '{}'", getContext().getOnErrorRecord(), ex)
